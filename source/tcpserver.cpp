@@ -6,7 +6,6 @@
 #include <iomanip>
 
 #include <rapid/platform/threadutils.h>
-#include <rapid/platform/cpuaffinity.h>
 #include <rapid/platform/utils.h>
 #include <rapid/platform/tcpipparameters.h>
 
@@ -93,8 +92,8 @@ void TcpServer::startThreadPool() {
 
 	uint32_t concurrentThreadCount = 0;
 
-	if (platform::isNUMASystem()) {
-		auto const processorInfo = platform::getProcessorInformation();
+	if (platform::SystemInfo::getInstance().isNumaSystem()) {
+		auto const processorInfo = platform::SystemInfo::getInstance().getProcessorInformation();
 		concurrentThreadCount = processorInfo.processorCoreCount * numThreadPerCpu_;
 	}
 	else {
@@ -112,7 +111,7 @@ void TcpServer::startThreadPool() {
 
 	for (auto const &thread : pThreadPool_->threads()) {
 		auto pThread = const_cast<std::thread *>(&thread);
-		if (!platform::isNUMASystem()) {
+		if (!platform::SystemInfo::getInstance().isNumaSystem()) {
 			RAPID_LOG_INFO() << "IO Worker thread " << i + 1
 				<< "(" << std::setw(5) << thread.get_id() << ")"
 				<< " starting...";
@@ -131,14 +130,14 @@ void TcpServer::setProcessAffinity() const {
 
 	platform::setProcessPriorityBoost(true);
 
-	if (!platform::isNUMASystem()) {
+	if (!platform::SystemInfo::getInstance().isNumaSystem()) {
 		// 預設動態更新處理器親和性關閉!
 		if (!::SetProcessAffinityUpdateMode(::GetCurrentProcess(), PROCESS_AFFINITY_ENABLE_AUTO_UPDATE)) {
 			throw Exception();
 		}
 	}
 	else {
-		for (auto const &numaNode : platform::getNumaProcessorInformation()) {
+		for (auto const &numaNode : platform::SystemInfo::getInstance().getNumaProcessorInformation()) {
 			if (numNumaNode_ == numaNode.node) {
 				if (!::SetProcessAffinityMask(::GetCurrentProcess(), numaNode.processorMask)) {
 					throw Exception();

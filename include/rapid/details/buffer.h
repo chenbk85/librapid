@@ -37,9 +37,9 @@ public:
     char* begin() const noexcept;
 
 private:
+    uint32_t commitSize_;
     Block block_;
     MemAllocatorPtr pAllocator_;
-    uint32_t commitSize_;
 };
 
 }

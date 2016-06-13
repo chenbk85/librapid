@@ -239,7 +239,6 @@
     <ClInclude Include="..\..\include\rapid\logging\stackdump.h" />
     <ClInclude Include="..\..\include\rapid\logging\timestamp.h" />
     <ClInclude Include="..\..\include\rapid\objectpool.h" />
-    <ClInclude Include="..\..\include\rapid\platform\cpuaffinity.h" />
     <ClInclude Include="..\..\include\rapid\platform\dllmap.h" />
     <ClInclude Include="..\..\include\rapid\platform\inifilereader.h" />
     <ClInclude Include="..\..\include\rapid\platform\memorymappedfile.h" />
@@ -313,7 +312,6 @@
     <ClCompile Include="..\..\source\logging\stackdump.cpp" />
     <ClCompile Include="..\..\source\logging\utilis.cpp" />
     <ClCompile Include="..\..\source\platform\applicationsingleton.cpp" />
-    <ClCompile Include="..\..\source\platform\cpuaffinity.cpp" />
     <ClCompile Include="..\..\source\platform\dllmap.cpp" />
     <ClCompile Include="..\..\source\platform\inifilereader.cpp" />
     <ClCompile Include="..\..\source\platform\memorymappedfile.cpp" />

@@ -16,6 +16,42 @@ namespace rapid {
 
 namespace platform {
 
+struct ProcessorInformation {
+	ProcessorInformation()
+		: numaNodeCount(0)
+		, processorCoreCount(0)
+		, logicalProcessorCount(0)
+		, processorL1CacheCount(0)
+		, processorL2CacheCount(0)
+		, processorL3CacheCount(0)
+		, processorPackageCount(0) {
+	}
+
+	friend std::ostream& operator<< (std::ostream& ostr, ProcessorInformation const &info);
+
+	uint32_t numaNodeCount;
+	uint32_t processorCoreCount;
+	uint32_t logicalProcessorCount;
+	uint32_t processorL1CacheCount;
+	uint32_t processorL2CacheCount;
+	uint32_t processorL3CacheCount;
+	uint32_t processorPackageCount;
+};
+
+struct NumaProcessor {
+	NumaProcessor()
+		: processor(0)
+		, node(0)
+		, processorMask(0) {
+	}
+
+	friend std::ostream& operator<< (std::ostream& ostr, std::vector<NumaProcessor> const &numaProcessors);
+
+	uint8_t processor;
+	uint8_t node;
+	uint64_t processorMask;
+};
+
 class SystemInfo : public utils::Singleton<SystemInfo> {
 public:
     SystemInfo();
@@ -30,9 +66,17 @@ public:
 
 	uint32_t roundUpToPageSize(uint32_t size) const noexcept;
 
+    bool isNumaSystem();
+
+    uint64_t getNumaNodeProcessorMask(uint8_t node);
+
+    std::vector<NumaProcessor> getNumaProcessorInformation();
+
+    ProcessorInformation getProcessorInformation();
+
 private:
     class SystemInfoImpl;
-    std::unique_ptr<SystemInfoImpl> pInfo_;
+    std::unique_ptr<SystemInfoImpl> pImpl_;
 };
 
 bool startupWinSocket();

@@ -165,9 +165,6 @@
     <ClInclude Include="..\..\include\rapid\platform\synchronousqueue.h">
       <Filter>Header Files\platform</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\rapid\platform\cpuaffinity.h">
-      <Filter>Header Files\platform</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\example\http\httpconstants.h">
       <Filter>Source Files\httpserver</Filter>
     </ClInclude>
@@ -409,9 +406,6 @@
     </ClCompile>
     <ClCompile Include="..\..\example\http\httpheaders.cpp">
       <Filter>Source Files\httpserver</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\source\platform\cpuaffinity.cpp">
-      <Filter>Source Files\platform</Filter>
     </ClCompile>
     <ClCompile Include="..\..\example\http\http2\http2pusher.cpp">
       <Filter>Source Files\httpserver\http2</Filter>

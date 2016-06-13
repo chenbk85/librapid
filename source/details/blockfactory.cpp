@@ -12,7 +12,6 @@
 #include <rapid/details/numavmemallocator.h>
 #include <rapid/details/vmemallocator.h>
 
-#include <rapid/platform/cpuaffinity.h>
 #include <rapid/platform/utils.h>
 #include <rapid/platform/privilege.h>
 
@@ -118,7 +117,7 @@ std::shared_ptr<BlockFactory> BlockFactory::createBlockFactory(uint8_t numNumaNo
     
 	MemAllocatorPtr pAllocator;
 
-	if (platform::isNUMASystem()) {
+	if (platform::SystemInfo::getInstance().isNumaSystem()) {
 		pAllocator = std::make_shared<details::NumaVMemAllocator>(numNumaNode, allocPoolSize, useLargePages);
     } else {
 		pAllocator = std::make_shared<details::VMemAllocator>(allocPoolSize, useLargePages);

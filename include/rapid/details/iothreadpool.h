@@ -15,8 +15,6 @@ namespace rapid {
 
 namespace details {
 
-class IoEventDispatcher;
-
 class IoThreadPool {
 public:
 	explicit IoThreadPool(uint32_t threadCount);
