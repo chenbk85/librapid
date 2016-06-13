@@ -39,7 +39,7 @@ public:
 private:
     Block block_;
     MemAllocatorPtr pAllocator_;
-	uint32_t commitSize_;
+    uint32_t commitSize_;
 };
 
 }
