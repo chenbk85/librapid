@@ -24,7 +24,7 @@
 #include <rapid/platform/threadutils.h>
 #include <rapid/platform/tcpipparameters.h>
 
-#include <rapid/details/acceptsocketpool.h>
+#include <rapid/details/socketacceptpoller.h>
 
 namespace rapid {
 
@@ -129,9 +129,9 @@ void SocketAcceptPooller::startPollAcceptEvent() {
 
     pollerThread_ = std::thread(std::bind(&SocketAcceptPooller::pollLoop, this));
    
-	platform::setThreadName(&pollerThread_, "AcceptSocketPool Thread");
+	platform::setThreadName(&pollerThread_, "SocketAcceptPooller Thread");
     
-	RAPID_LOG_INFO() << "AcceptSocketPool thread("
+	RAPID_LOG_INFO() << "SocketAcceptPooller thread("
                      << std::setw(5) << pollerThread_.get_id()
                      << ") starting...";
 	

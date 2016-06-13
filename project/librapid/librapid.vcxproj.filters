@@ -186,9 +186,6 @@
     <ClInclude Include="..\..\example\http\http2\http2stream.h">
       <Filter>Source Files\httpserver\http2</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\rapid\details\acceptsocketpool.h">
-      <Filter>Header Files\details</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\rapid\details\common.h">
       <Filter>Header Files\details</Filter>
     </ClInclude>
@@ -330,6 +327,9 @@
     <ClInclude Include="..\..\include\rapid\logging\timestamp.h">
       <Filter>Header Files\logging</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rapid\details\socketacceptpoller.h">
+      <Filter>Header Files\details</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\iobuffer.cpp">
@@ -428,9 +428,6 @@
     <ClCompile Include="..\..\example\http\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\details\acceptsocketpool.cpp">
-      <Filter>Source Files\details</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\source\details\ioeventdispatcher.cpp">
       <Filter>Source Files\details</Filter>
     </ClCompile>
@@ -516,6 +513,9 @@
       <Filter>Source Files\details</Filter>
     </ClCompile>
     <ClCompile Include="..\..\source\details\timingwheel.cpp">
+      <Filter>Source Files\details</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\details\socketacceptpoller.cpp">
       <Filter>Source Files\details</Filter>
     </ClCompile>
   </ItemGroup>

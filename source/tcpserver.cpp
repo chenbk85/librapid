@@ -15,7 +15,7 @@
 
 #include <rapid/details/socket.h>
 #include <rapid/details/contracts.h>
-#include <rapid/details/acceptsocketpool.h>
+#include <rapid/details/socketacceptpoller.h>
 #include <rapid/details/wasextapi.h>
 #include <rapid/details/ioeventdispatcher.h>
 #include <rapid/details/iothreadpool.h>

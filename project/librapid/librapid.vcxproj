@@ -150,7 +150,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;WIN32_LEAN_AND_MEAN;__SSE4_2__;ZIP_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../../include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/rapidxml/include/;../../thirdparty/hash/;../../thirdparty/stlencoders/include/;C:\OpenSSL-Win64\include;../../thirdparty/rapidjson/include/;../../thirdparty/MurmurHash3/;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/date/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/rapidxml/include/;../../thirdparty/hash/;../../thirdparty/stlencoders/include/;../../thirdparty/openssl/include/;../../thirdparty/rapidjson/include/;../../thirdparty/MurmurHash3/;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/date/</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
@@ -167,8 +167,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>zlib-static-mt.lib;libeay32MD.lib;ssleay32MD.lib;libtcmalloc_minimal.lib;zip-static-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>../../thirdparty/zlib/lib/;C:\OpenSSL-Win64\lib\VC\;../../thirdparty/gperftools/x64/Release/;../../thirdparty/libzip/build/lib/Release/</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib-static-mt.lib;libeay32MT.lib;ssleay32MT.lib;libtcmalloc_minimal.lib;zip-static-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../../thirdparty/zlib/lib/;../../thirdparty/openssl/lib/VC/;../../thirdparty/gperftools/x64/Release/;../../thirdparty/libzip/build/lib/Release/</AdditionalLibraryDirectories>
       <ForceSymbolReferences>__tcmalloc</ForceSymbolReferences>
       <Profile>true</Profile>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
@@ -213,10 +213,10 @@
     <ClInclude Include="..\..\example\http\websocket\websocketconstants.h" />
     <ClInclude Include="..\..\example\http\websocket\websocketservice.h" />
     <ClInclude Include="..\..\include\rapid\details\blockfactory.h" />
+    <ClInclude Include="..\..\include\rapid\details\socketacceptpoller.h" />
     <ClInclude Include="..\..\include\rapid\details\socketaddress.h" />
     <ClInclude Include="..\..\include\rapid\details\timingwheel.h" />
     <ClInclude Include="..\..\include\rapid\eventhandler.h" />
-    <ClInclude Include="..\..\include\rapid\details\acceptsocketpool.h" />
     <ClInclude Include="..\..\include\rapid\details\common.h" />
     <ClInclude Include="..\..\include\rapid\details\contracts.h" />
     <ClInclude Include="..\..\include\rapid\details\ioeventdispatcher.h" />
@@ -292,7 +292,7 @@
     <ClCompile Include="..\..\example\http\openssl\sslmanager.cpp" />
     <ClCompile Include="..\..\example\http\websocket\websocketcodec.cpp" />
     <ClCompile Include="..\..\example\http\websocket\websocketservice.cpp" />
-    <ClCompile Include="..\..\source\details\acceptsocketpool.cpp" />
+    <ClCompile Include="..\..\source\details\socketacceptpoller.cpp" />
     <ClCompile Include="..\..\source\details\blockfactory.cpp" />
     <ClCompile Include="..\..\source\details\ioeventdispatcher.cpp" />
     <ClCompile Include="..\..\source\details\ioeventqueue.cpp" />
