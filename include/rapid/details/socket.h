@@ -17,19 +17,19 @@ namespace details {
 
 template <typename T>
 inline bool getSocketExFunPtr(SOCKET socket,
-							  T *address,
-							  GUID const *guid,
-							  DWORD controlCode) {
-	DWORD bytes = 0;
-	return ::WSAIoctl(socket,
-					  controlCode,
-					  LPVOID(guid),
-					  sizeof(GUID),
-					  address,
-					  sizeof(T),
-					  &bytes,
-					  nullptr,
-					  nullptr) != SOCKET_ERROR;
+        T *address,
+        GUID const *guid,
+        DWORD controlCode) {
+        DWORD bytes = 0;
+    return ::WSAIoctl(socket,
+        controlCode,
+        LPVOID(guid),
+        sizeof(GUID),
+        address,
+        sizeof(T),
+        &bytes,
+        nullptr,
+        nullptr) != SOCKET_ERROR;
 }
 
 class Socket {
