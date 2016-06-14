@@ -69,7 +69,7 @@ void TcpServer::startListening(ContextEventHandler &&callback, uint16_t numaNode
 	}
 	
 	pSocketAcceptPooller_->setContextEventHandler(std::forward<ContextEventHandler>(callback));
-	pSocketAcceptPooller_->startPollAcceptEvent();
+	pSocketAcceptPooller_->startPoll();
 }
 
 void TcpServer::shutdown() {
@@ -105,7 +105,7 @@ void TcpServer::startThreadPool() {
 	details::IoEventDispatcher::getInstance() = std::move(dispatcher);
 	pThreadPool_ = std::make_shared<details::IoThreadPool>(concurrentThreadCount);
 
-	pThreadPool_->start();
+	pThreadPool_->runAll();
 
 	uint32_t i = 0;
 
@@ -131,7 +131,7 @@ void TcpServer::setProcessAffinity() const {
 	platform::setProcessPriorityBoost(true);
 
 	if (!platform::SystemInfo::getInstance().isNumaSystem()) {
-		// 預設動態更新處理器親和性關閉!
+		// 開啟動態更新處理器親和性!
 		if (!::SetProcessAffinityUpdateMode(::GetCurrentProcess(), PROCESS_AFFINITY_ENABLE_AUTO_UPDATE)) {
 			throw Exception();
 		}

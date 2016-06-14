@@ -57,10 +57,8 @@ void startLogging() {
 	rapid::logging::addLogAppender(pConsoleOuputAppender);
 }
 
-void startHttpServer() {
-	startLogging();
-
-	HttpServerConfigFacade::getInstance().loadXmlConfigFile("librapid.config.xml");
+void httpServerMain(int argc, char *argv[]) {
+	HttpServerConfigFacade::getInstance().loadXmlConfigFile(argv[1]);
 
 #ifdef ENABLE_FAKE_HTTP_SERVER
 	// IPV4 binding
@@ -97,6 +95,8 @@ static char const s_serverTitle[] = {
 int main(int argc, char *argv[]) {
 	std::cout << s_serverTitle;
 
+    startLogging();
+
 	SCOPE_EXIT() {
 		rapid::logging::stopLogging();
 	};
@@ -104,18 +104,8 @@ int main(int argc, char *argv[]) {
 	// Setup console handler, we want to 'Ctrl + C' stopping server.
 	::SetConsoleCtrlHandler(consoleHandler, TRUE);
 
-	/*
-	// Test application is singleetion.
-	rapid::platform::ApplicationSingleton app;
-	if (app.hasInstanceRunning()) {
-		RAPID_LOG_FATAL() << "Server already running!" << std::endl;
-		std::cin.get();
-		return EXIT_FAILURE;
-	}
-	*/
-
 	try {
-		startHttpServer();
+        httpServerMain(argc, argv);
 	} catch (std::exception const &e) {
 		RAPID_LOG_FATAL() << e.what();
 		std::cin.get();

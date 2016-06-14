@@ -24,7 +24,7 @@ public:
 
     ~IoThreadPool();
 
-    void start();
+    void runAll();
 
     void joinAll();
 

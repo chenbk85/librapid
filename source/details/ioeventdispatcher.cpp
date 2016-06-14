@@ -31,7 +31,7 @@ IoEventDispatcher::IoEventDispatcher(IoEventDispatcher && other) {
 IoEventDispatcher::~IoEventDispatcher() {
 }
 
-void IoEventDispatcher::add(HANDLE device, ULONG_PTR compKey) const {
+void IoEventDispatcher::addDevice(HANDLE device, ULONG_PTR compKey) const {
     if (!pIoEventQueue_->associateDevice(device, compKey)) {
         throw Exception();
     }
@@ -56,7 +56,7 @@ void IoEventDispatcher::postQuit() const {
     }
 }
 
-void IoEventDispatcher::waitForEventLoop(uint32_t timeout) const {
+void IoEventDispatcher::waitForIoLoop(uint32_t timeout) const {
 	RAPID_LOG_TRACE_INFO();
 
 	// NOTE: 

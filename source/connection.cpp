@@ -106,7 +106,7 @@ void Connection::updateAcceptContext() {
 
     hasUpdataAcceptContext_ = true;
     if (!isReuseSocket_) {
-		details::IoEventDispatcher::getInstance().add(acceptSocket_.handle(), reinterpret_cast<ULONG_PTR>(this));
+		details::IoEventDispatcher::getInstance().addDevice(acceptSocket_.handle(), reinterpret_cast<ULONG_PTR>(this));
     }
 }
 

@@ -27,7 +27,9 @@ IoThreadPool::~IoThreadPool() {
     joinAll();
 }
 
-void IoThreadPool::start() {
+void IoThreadPool::runAll() {
+    static auto constexpr WAIT_IO_COMPLETION_TIMEOUT = 15000;
+
     for (uint32_t i = 0; i < numThreads_; ++i) {
         pool_.emplace_back([i, this]() {
 			++startedThreadCount_;
@@ -40,7 +42,7 @@ void IoThreadPool::start() {
 			_alloca(padCacheLineSizeCount_ * CACHE_LINE_PAD_SIZE);
 
 			try {
-				details::IoEventDispatcher::getInstance().waitForEventLoop(15000);
+				details::IoEventDispatcher::getInstance().waitForIoLoop(WAIT_IO_COMPLETION_TIMEOUT);
 				// 任何一個Thread結束的時候都多發送一個結束Key(KEY_IO_SERVICE_STOP), 可以避免一個Thread處理多個結束Key(KEY_IO_SERVICE_STOP).
 				details::IoEventDispatcher::getInstance().postQuit();
 			} catch (std::exception const &e) {

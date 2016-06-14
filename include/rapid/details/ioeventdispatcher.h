@@ -32,9 +32,9 @@ public:
     IoEventDispatcher(IoEventDispatcher const &) = delete;
     IoEventDispatcher& operator=(IoEventDispatcher const &) = delete;
 
-    void add(HANDLE device, ULONG_PTR compKey) const;
+    void addDevice(HANDLE device, ULONG_PTR compKey) const;
 
-    void waitForEventLoop(uint32_t timeout) const;
+    void waitForIoLoop(uint32_t timeout) const;
 
     void postQuit() const;
 
@@ -43,6 +43,7 @@ public:
 private:
 	static auto constexpr KEY_IO_SERVICE_STOP = MAXULONG_PTR;
 	static auto constexpr MAX_OVERLAPPED_ENTRIES = 128;
+    
     std::unique_ptr<IoEventQueue> pIoEventQueue_;
 };
 

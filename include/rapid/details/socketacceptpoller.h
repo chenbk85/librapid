@@ -39,7 +39,7 @@ public:
 
     void setScaleSize(size_t size);
 
-	void startPollAcceptEvent();
+	void startPoll();
 
     void stopPoll();
 

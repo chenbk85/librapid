@@ -89,7 +89,7 @@ void SocketAcceptPooller::stopPoll() {
 	utils::Singleton<WsaExtAPI>::getInstance().cancelAllPendingIoRequest(*pListenSocket_);
 }
 
-void SocketAcceptPooller::startPollAcceptEvent() {
+void SocketAcceptPooller::startPoll() {
 	RAPID_LOG_TRACE_INFO();
 
     RAPID_ENSURE(scaleSize_ <= maxPoolSize_);
@@ -123,7 +123,7 @@ void SocketAcceptPooller::startPollAcceptEvent() {
 		* platform::TcpIpParameters::getInstance().getTcpTimedWaitDelay(), 60);
 	pReuseTimingWheel_->start();
 
-	details::IoEventDispatcher::getInstance().add(pListenSocket_->handle(), 0);
+	details::IoEventDispatcher::getInstance().addDevice(pListenSocket_->handle(), 0);
 
     addSocketToPool();
 
