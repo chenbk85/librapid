@@ -80,6 +80,12 @@ void HttpContext::handshake(rapid::ConnectionPtr &pConn) {
 void HttpContext::onHttpGetMessage(rapid::ConnectionPtr &pConn) {
 	RAPID_LOG_TRACE_FUNC();
 
+    // HTTP1.1 有些browser需要'Connection'來表示keep-alive!
+    // HTTP2 中取消了'Connection' 
+    if (!HttpServerConfigFacade::getInstance().isUseHttp2()) {
+        pHttpResponse_->setKeepAlive(true);
+    }
+
 	if (!pHttpRequest_->isUpgradeRequest()) {
 		sendMessage(pConn);
 	} else {
@@ -97,6 +103,12 @@ void HttpContext::onHttpGetMessage(rapid::ConnectionPtr &pConn) {
 
 void HttpContext::onHttpPostMessage(rapid::ConnectionPtr &pConn) {
 	RAPID_LOG_TRACE_FUNC();
+
+    // HTTP1.1 有些browser需要'Connection'來表示keep-alive!
+    // HTTP2 中取消了'Connection' 
+    if (!HttpServerConfigFacade::getInstance().isUseHttp2()) {
+        pHttpResponse_->setKeepAlive(true);
+    }
 
 	pHttpRequest_->createTempFile();
 

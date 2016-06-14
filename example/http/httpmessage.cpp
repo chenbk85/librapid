@@ -408,7 +408,6 @@ bool HttpResponse::send(rapid::ConnectionPtr &pConn, HttpRequestPtr httpRequest)
 
 	switch (state_) {
 	case SEND_HTTP_HEADER:
-		setKeepAlive(true);
 		writeResponseHeader(pConn, pSendBuffer, httpRequest);
 		break;
 	case SEND_HTTP_CONTENT:
