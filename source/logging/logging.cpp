@@ -18,7 +18,9 @@
 
 #include <rapid/utils/singleton.h>
 #include <rapid/utils/stringutilis.h>
+#include <rapid/utils/stopwatch.h>
 
+#include <rapid/logging/mpmc_bounded_queue.h>
 #include <rapid/logging/timestamp.h>
 #include <rapid/logging/stackdump.h>
 #include <rapid/logging/logging.h>
@@ -87,43 +89,56 @@ public:
 
     ~LoggingWorker();
 
-    template <typename EventHandler>
-	void add(EventHandler &&writeLogCallback) {
-		actions_.push(std::move(writeLogCallback));
-		cond_.notify_one();
+    template <typename Lambda>
+	void add(Lambda &&lambda) {
+        queue_.enqueue(std::move(lambda));
     }
 
     void stop();
 private:
+    static auto constexpr MAX_LOGGING_SIZE = 64 * 1024;
+
 	volatile bool stopped_ : 1;
-	Concurrency::concurrent_queue<std::function<void()>> actions_;
-    std::thread thread_;
-	std::mutex mutex_;
-	std::condition_variable cond_;
+    mpmc_bounded_queue<std::function<void()>> queue_;
+    std::thread writterThread_;
+    utils::SystemStopwatch lastWriteTime_;
 };
 
 LoggingWorker::LoggingWorker()
-	: stopped_(false) {
-	thread_ = std::thread([this] {
-		while (!stopped_) {
-			while (actions_.empty()) {
-				std::unique_lock<std::mutex> lock{ mutex_ };
-				cond_.wait(lock);
-			}
+	: stopped_(false)
+    , queue_(MAX_LOGGING_SIZE) {
+	writterThread_ = std::thread([this] {
+        std::function<void()> action;
 
-			std::function<void()> action;
-			while (actions_.try_pop(action)) {
-				action();
-			}
+        lastWriteTime_.reset();
+		
+        while (!stopped_) {
+            if (!queue_.dequeue(action)) {
+                auto lastWriteTime = lastWriteTime_.elapsed<std::chrono::microseconds>();
+                if (lastWriteTime <= std::chrono::microseconds(50)) {
+                    continue;
+                }
+                if (lastWriteTime <= std::chrono::microseconds(100)) {
+                    std::this_thread::yield();
+                    continue;
+                }
+                if (lastWriteTime <= std::chrono::milliseconds(200)) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    continue;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            } else {
+                action();
+                lastWriteTime_.reset();
+            }
         }
     });
 }
 
 void LoggingWorker::stop() {
 	stopped_ = true;
-    add([] {}); // Weakup theaed to stop!
-	if (thread_.joinable()) {
-		thread_.join();
+	if (writterThread_.joinable()) {
+		writterThread_.join();
     }
 }
 
@@ -141,7 +156,7 @@ public:
 };
 
 std::ostream& operator << (std::ostream &ostr, __timeb64 const &timestamp) {
-	tm localTime = { 0 };
+	tm localTime;
 
 	::_localtime64_s(&localTime, &timestamp.time);
 

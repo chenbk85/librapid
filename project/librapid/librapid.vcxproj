@@ -236,6 +236,7 @@
     <ClInclude Include="..\..\include\rapid\iovector.h" />
     <ClInclude Include="..\..\include\rapid\logging\eventlog.h" />
     <ClInclude Include="..\..\include\rapid\logging\logging.h" />
+    <ClInclude Include="..\..\include\rapid\logging\mpmc_bounded_queue.h" />
     <ClInclude Include="..\..\include\rapid\logging\stackdump.h" />
     <ClInclude Include="..\..\include\rapid\logging\timestamp.h" />
     <ClInclude Include="..\..\include\rapid\objectpool.h" />

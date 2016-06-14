@@ -50,23 +50,23 @@ public:
 
 	void postAsync(std::function<void(ConnectionPtr)> handler);
 
-    template <typename EventHandler>
-	void setAcceptEventHandler(EventHandler &&handler) {
+    template <typename Lambda>
+	void setAcceptEventHandler(Lambda &&handler) {
 		pAcceptBuffer_->setCompleteHandler(std::move(handler));
     }
 
-	template <typename EventHandler>
-	void setReceiveEventHandler(EventHandler &&handler) {
+	template <typename Lambda>
+	void setReceiveEventHandler(Lambda &&handler) {
 		pReceiveBuffer_->setCompleteHandler(std::move(handler));
     }
 
-	template <typename EventHandler>
-	void setSendEventHandler(EventHandler &&handler) {
+	template <typename Lambda>
+	void setSendEventHandler(Lambda &&handler) {
 		pSendBuffer_->setCompleteHandler(std::move(handler));
     }
 
-	template <typename EventHandler>
-	void setDisconnectEventHandler(EventHandler &&handler) {
+	template <typename Lambda>
+	void setDisconnectEventHandler(Lambda &&handler) {
 		pDisconnectBuffer_->setCompleteHandler(std::move(handler));
     }
 

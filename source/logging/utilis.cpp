@@ -166,7 +166,7 @@ void DebugOutputLogSink::write(LogFormatter &format, LogEntry const &record) {
 FileLogAppender::FileLogAppender()
 	: LogAppender()
 	, limitLogSize_(LIMIT_FILE_LOG_SIZE)
-	, logFileName_(L"server") {
+	, logFileName_(L"server.log") {
 	logStartDate_ = date::sys_days::clock::now();
 }
 
@@ -246,7 +246,7 @@ void FileLogAppender::truncate(size_t writtenSize) {
 }
 
 void FileLogAppender::setLogFileName(std::wstring const &logFileName) {
-	logFileName_ = logFileName + L".log";
+	logFileName_ = logFileName;
 }
 
 void FileLogAppender::setLogDirectory(std::wstring const &directory) {

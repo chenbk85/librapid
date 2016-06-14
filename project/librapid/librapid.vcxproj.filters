@@ -327,6 +327,9 @@
     <ClInclude Include="..\..\include\rapid\details\socketacceptpoller.h">
       <Filter>Header Files\details</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rapid\logging\mpmc_bounded_queue.h">
+      <Filter>Header Files\logging</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\iobuffer.cpp">
