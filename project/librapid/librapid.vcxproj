@@ -233,7 +233,6 @@
     <ClInclude Include="..\..\include\rapid\details\vmemallocator.h" />
     <ClInclude Include="..\..\include\rapid\exception.h" />
     <ClInclude Include="..\..\include\rapid\iobuffer.h" />
-    <ClInclude Include="..\..\include\rapid\iovector.h" />
     <ClInclude Include="..\..\include\rapid\logging\eventlog.h" />
     <ClInclude Include="..\..\include\rapid\logging\logging.h" />
     <ClInclude Include="..\..\include\rapid\logging\mpmc_bounded_queue.h" />

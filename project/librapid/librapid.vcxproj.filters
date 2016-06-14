@@ -63,9 +63,6 @@
     <ClInclude Include="..\..\include\rapid\iobuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\rapid\iovector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\rapid\tcpserver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
