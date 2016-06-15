@@ -32,8 +32,6 @@ public:
 
 private:
 	static auto constexpr MAX_START_THREAD_TIME_EXPIRED = 40000;
-	static auto constexpr CACHE_LINE_PAD_SIZE = 128;
-	static auto constexpr MAX_CACHE_LINE_PAD_SIZE = 4096;
 
 	void ensureStarted();
     uint32_t numThreads_;

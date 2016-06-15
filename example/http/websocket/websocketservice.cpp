@@ -1,3 +1,6 @@
+#include <unordered_map>
+#include <vector>
+
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -6,6 +9,7 @@
 #include <rapid/platform/performancecounter.h>
 #include <rapid/platform/utils.h>
 #include <rapid/logging/logging.h>
+#include <rapid/platform/spinlock.h>
 #include <rapid/details/timingwheel.h>
 #include <rapid/utils/stringutilis.h>
 
@@ -26,7 +30,7 @@ public:
 
 	}
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn) override {
+	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
 		// Set dummy send handler, We don't care about send success or not!
 		pConn->setSendEventHandler([](rapid::ConnectionPtr) {});	
 
@@ -95,17 +99,251 @@ private:
 	std::vector<std::unique_ptr<rapid::platform::PerformanceCounter>> counters_;
 };
 
+static std::string const MSG_TYPE_ID = "id";
+static std::string const MSG_TYPE_MESSAGE = "message";
+static std::string const MSG_TYPE_USERNAME = "username";
+static std::string const MSG_TYPE_USERLIST = "userlist";
+
+static rapid::platform::Spinlock s_lock;
+static std::unordered_map<std::string, rapid::ConnectionPtr> s_userlist;
+
 class WebSocketChatService : public WebSocketService {
 public:
-	WebSocketChatService() {
+	struct Message {
+		std::string types;
+		std::string id;
+		int64_t date;
+		std::string content;
+	};
 
+	WebSocketChatService() {
+		messages_.reserve(16);
 	}
 
 	virtual ~WebSocketChatService() {
 
 	}
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn) override {
+	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+		pConn->setSendEventHandler([this, pContext](rapid::ConnectionPtr &conn) {
+			pContext->readLoop(conn);
+		});
+
+		writeUid(time(nullptr), pConn->getSendBuffer());
+		pConn->sendAsync();
+	}
+
+	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
+		bool isSendCompleted = true;
+
+		if (webSocketRequest->isClosed()) {
+			onWebSocketClose(pConn);
+			return false; // ¤£Ä~ÄòÅª¨ú!
+		}
+
+		auto pBuffer = pConn->getReceiveBuffer();
+		if (pBuffer->isEmpty()) {
+			return true;
+		}
+
+		auto message = parse(pBuffer);
+
+		if (message.types == MSG_TYPE_USERNAME) {
+			std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+			s_userlist[message.content] = pConn;
+			
+			username_ = message.content;
+			enqueueUsernameResponse(username_);
+			enqueueUserListResponse(toUserList());
+		} else if (message.types == MSG_TYPE_MESSAGE) {
+			enqueueMessageResponse(username_, message.content);
+		}
+
+		isSendCompleted = broadcastMessage();
+		return isSendCompleted;
+	}
+
+	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
+		{
+			std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+			s_userlist.erase(username_);
+		}
+		enqueueUserListResponse(toUserList());
+		broadcastMessage();
+	}
+
+private:
+	void AddMember(rapidjson::Document &doc, std::string const &key, std::string const &value) {
+		rapidjson::Value object(rapidjson::Type::kObjectType);
+		object.SetString(value.c_str(), doc.GetAllocator());
+
+		rapidjson::Value keyobject(rapidjson::Type::kStringType);
+		keyobject.SetString(key.c_str(), key.length(), doc.GetAllocator());
+		doc.AddMember(keyobject, object, doc.GetAllocator());
+	}
+
+	void AddMember(rapidjson::Document &doc, std::string const &key, int64_t const &value) {
+		rapidjson::Value object(rapidjson::Type::kObjectType);
+		object.SetInt64(value);
+
+		rapidjson::Value keyobject(rapidjson::Type::kStringType);
+		keyobject.SetString(key.c_str(), key.length(), doc.GetAllocator());
+		doc.AddMember(keyobject, object, doc.GetAllocator());
+	}
+
+	void writeUid(int uid, rapid::IoBuffer *pBuffer) {
+		rapidjson::Document doc(rapidjson::Type::kObjectType);
+
+		AddMember(doc, "type", MSG_TYPE_ID);
+		AddMember(doc, "id", std::to_string(uid));
+		AddMember(doc, "date", time(nullptr));
+
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		doc.Accept(writer);
+
+		WebSocketResponse response;
+		response.setContentLength(buffer.GetSize());
+		response.serialize(pBuffer);
+		pBuffer->append(buffer.GetString(), buffer.GetSize());
+	}
+
+	void enqueueUsernameResponse(std::string const &username) {
+		rapidjson::Document doc(rapidjson::Type::kObjectType);
+
+		AddMember(doc, "type", MSG_TYPE_USERNAME);
+		AddMember(doc, "name", username);
+		AddMember(doc, "date", time(nullptr));
+
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		doc.Accept(writer);
+
+		messages_.emplace_back(buffer.GetString(), buffer.GetSize());
+	}
+
+	void enqueueMessageResponse(std::string const &username, std::string const &text) {
+		rapidjson::Document doc(rapidjson::Type::kObjectType);
+
+		AddMember(doc, "type", MSG_TYPE_MESSAGE);
+		AddMember(doc, "name", username);
+		AddMember(doc, "date", time(nullptr));
+		AddMember(doc, "text", text);
+
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		doc.Accept(writer);
+
+		messages_.emplace_back(buffer.GetString(), buffer.GetSize());
+	}
+
+	void enqueueUserListResponse(std::vector<std::string> const &userlist) {
+		rapidjson::Document doc(rapidjson::Type::kObjectType);
+
+		AddMember(doc, "type", MSG_TYPE_USERLIST);
+
+		rapidjson::Value array(rapidjson::kArrayType);
+
+		for (auto const &user : userlist) {
+			rapidjson::Value object(rapidjson::kObjectType);
+			object.SetString(user.c_str(), user.length());
+			array.PushBack(object, doc.GetAllocator());
+		}
+
+		doc.AddMember("users", array, doc.GetAllocator());
+		
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		doc.Accept(writer);
+
+		messages_.emplace_back(buffer.GetString(), buffer.GetSize());
+	}
+
+	std::vector<std::string> toUserList() {
+		std::vector<std::string> userlist;
+		userlist.reserve(s_userlist.size());
+		for (auto &pair : s_userlist) {
+			userlist.push_back(pair.first);
+		}
+		return userlist;
+	}
+
+	Message parse(rapid::IoBuffer *pBuffer) {
+		auto data = pBuffer->read(pBuffer->readable());
+
+		RAPID_LOG_TRACE() << "Chat Debug (" << data.length() << ")\r\n" << data;
+
+		rapidjson::Document doc;
+		doc.Parse(data.c_str());
+		if (doc.HasParseError()) {
+			throw rapid::Exception("Parse json 45error");
+		}
+
+		auto id = doc.FindMember("id");
+		auto type = doc.FindMember("type");
+		auto date = doc.FindMember("date");
+		std::string content;
+
+		if ((*type).value.GetString() == MSG_TYPE_USERNAME) {
+			auto name = doc.FindMember("name");
+			content = (*name).value.GetString();
+		} else if ((*type).value.GetString() == MSG_TYPE_MESSAGE) {
+			auto text = doc.FindMember("text");
+			content = (*text).value.GetString();
+		}
+
+		return {
+			(*type).value.GetString(),
+			(*id).value.GetString(),
+			(*date).value.GetInt64(),
+			content,
+		};
+	}
+	
+	bool broadcastMessage() {
+		std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+		
+		while (!messages_.empty()) {
+			auto message = messages_.back();
+
+			for (auto &user : s_userlist) {
+				auto pBuffer = user.second->getSendBuffer();
+				WebSocketResponse response;
+				response.setContentLength(message.length());
+				response.serialize(pBuffer);
+				pBuffer->append(message.c_str(), message.length());
+			}
+			messages_.pop_back();
+		}
+
+		auto isSendCompleted = false;
+
+		for (auto &pair : s_userlist) {
+			if (pair.first == username_) {
+				isSendCompleted = pair.second->sendAsync();
+			} else {
+				pair.second->sendAsync();
+			}
+		}
+		return isSendCompleted;
+	}
+	
+	std::vector<std::string> messages_;
+	std::string username_;
+};
+
+class WebSocketEchoService : public WebSocketService {
+public:
+	WebSocketEchoService() {
+
+	}
+
+	virtual ~WebSocketEchoService() {
+
+	}
+
+	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+		pContext->readLoop(pConn);
 	}
 
 	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
@@ -132,23 +370,55 @@ public:
 	}
 };
 
+class WebSocketBenchmarkService : public WebSocketService {
+public:
+	WebSocketBenchmarkService() {
+
+	}
+
+	virtual ~WebSocketBenchmarkService() {
+
+	}
+
+	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+		pContext->readLoop(pConn);
+	}
+
+	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
+		bool isSendCompleted = true;
+		char buffer[1024] = { '1', '0', '2', '4', 0 };
+
+		if (!webSocketRequest->isClosed()) {
+			auto pReceiveBuffer = pConn->getReceiveBuffer();
+			auto content = pReceiveBuffer->read(pReceiveBuffer->readable());
+			WebSocketResponse response;
+			auto pSendBuffer = pConn->getSendBuffer();
+			response.setContentLength(sizeof(buffer));
+			response.serialize(pSendBuffer);
+			pSendBuffer->append(buffer, sizeof(buffer));
+			isSendCompleted = pConn->sendAsync();
+		} else {
+			onWebSocketClose(pConn);
+		}
+
+		return isSendCompleted;
+	}
+
+	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
+
+	}
+};
+
+
 WebSocketService::WebSocketService() {
 }
 
 std::shared_ptr<WebSocketService> WebSocketService::createService(std::string const & protocol) {
 	if (protocol == "chat") {
-		return createChatService();
+		return std::make_shared<WebSocketChatService>();
 	} else if (protocol == "perfmon") {
-		return createPerfmonService();
+		return std::make_shared<WebSocketPerfmonService>();
 	}
-	return createChatService();
+	//return std::make_shared<WebSocketEchoService>();
+	return std::make_shared<WebSocketBenchmarkService>();
 }
-
-std::shared_ptr<WebSocketService> WebSocketService::createPerfmonService() {
-	return std::make_shared<WebSocketPerfmonService>();
-}
-
-std::shared_ptr<WebSocketService> WebSocketService::createChatService() {
-	return std::make_shared<WebSocketChatService>();
-}
-

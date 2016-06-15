@@ -184,6 +184,8 @@ bool SocketAcceptPooller::hasAcceptConnection(WSANETWORKEVENTS *events) const {
 }
 
 void SocketAcceptPooller::pollLoop() {
+	_alloca(CACHE_LINE_PAD_SIZE);
+
     try {
         pollNetworkEvent();
     } catch (Exception const &e) {

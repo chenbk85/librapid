@@ -172,9 +172,11 @@ bool WebSocketFrameReader::isReadyRead(rapid::IoBuffer* buffer) {
 	size_t bytesRead = 0;
 
 	switch (unparsedContentLength_) {
+		// 包含16 bit Extend Payload Length
 	case WS_16BIT_EXT_PAYLOAD_LENGTH:
 		bytesRead = (WS_MIN_SIZE + getMaskSize() + 2);
 		break;
+		// 包含 64 bit Extend Payload Length
 	case WS_64BIT_EXT_PAYLOAD_LENGTH:
 		bytesRead = (WS_MIN_SIZE + getMaskSize() + 8);
 		break;
@@ -195,22 +197,29 @@ void WebSocketFrameReader::parseContentLength(rapid::IoBuffer* buffer) {
 	indexOfFirstMask_ = 2;
 
 	switch (unparsedContentLength_) {
+		// 包含16 bit Extend Payload Length
 	case WS_16BIT_EXT_PAYLOAD_LENGTH:
 		memcpy(&contentLength_, buffer->peek() + WS_MIN_SIZE, sizeof(uint16_t));
 		contentLength_ = static_cast<uint64_t>(ntohs(contentLength_));
 		indexOfFirstMask_ = 4;
+		bytesReceiveLengthAndMask_ = getMaskSize() + sizeof(uint16_t);
 		break;
 	case WS_64BIT_EXT_PAYLOAD_LENGTH:
+		// 包含 64 bit Extend Payload Length
 		memcpy(&contentLength_, buffer->peek() + WS_MIN_SIZE, sizeof(uint64_t));
 		contentLength_ = htonll(contentLength_);
 		indexOfFirstMask_ = 10;
+		bytesReceiveLengthAndMask_ = getMaskSize() + sizeof(uint64_t);
 		break;
 	default:
 		bytesReceiveLengthAndMask_ = getMaskSize();
 		contentLength_ = unparsedContentLength_;
 		break;
 	}
-	memcpy(mask_, buffer->peek() + indexOfFirstMask_, WS_MASK_SIZE);
+
+	if (isMasked_) {
+		memcpy(mask_, buffer->peek() + indexOfFirstMask_, WS_MASK_SIZE);
+	}
 }
 
 void WebSocketFrameReader::maskData(rapid::IoBuffer *buffer) {

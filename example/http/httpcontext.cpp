@@ -215,6 +215,8 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 		pHttpResponse_->add(HTTP_SEC_WEBSOCKET_PROTOCOL, static_cast<std::string const &>(protocol));
 	}
 
+	RAPID_LOG_TRACE() << "WebSocket protocol: " << protocol;
+
 	pHttpResponse_->serialize(pConn->getSendBuffer());
 
 	// Setup WebSocket service
@@ -233,13 +235,15 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 
 	pHttpCodec_ = std::make_unique<WebSocketCodec>(pWebSocketDispatcher);
 
+	auto pContext = shared_from_this();
+
 	// Set handler to read WebSocket data
-	pConn->setSendEventHandler([this](rapid::ConnectionPtr conn) {
-		pWebSocketService_->onWebSocketOpen(conn);
+	pConn->setSendEventHandler([this, pContext](rapid::ConnectionPtr conn) {
+		pWebSocketService_->onWebSocketOpen(conn, pContext);
 	});
 
 	if (pConn->sendAsync()) {
-		pWebSocketService_->onWebSocketOpen(pConn);
+		pWebSocketService_->onWebSocketOpen(pConn, pContext);
 	}
 }
 

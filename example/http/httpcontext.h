@@ -15,7 +15,7 @@
 
 #include "predeclare.h"
 
-class HttpContext {
+class HttpContext : public std::enable_shared_from_this<HttpContext> {
 public:
 	HttpContext();
 

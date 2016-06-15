@@ -9,6 +9,9 @@
 
 #include <rapid/exception.h>
 
+auto constexpr CACHE_LINE_PAD_SIZE = 128;
+auto constexpr MAX_CACHE_LINE_PAD_SIZE = 4096;
+
 #define RAPID_ENSURE(expr)  \
 	if (!(expr)) {\
 		__debugbreak(); \

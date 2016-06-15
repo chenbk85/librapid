@@ -34,6 +34,7 @@ struct LogEntry {
 		, line(0)
 		, level(_MAX_LEVEL_) {
 	}
+
 	char const *file;
 	int line;
 	Level level;

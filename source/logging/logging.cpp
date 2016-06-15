@@ -108,6 +108,8 @@ LoggingWorker::LoggingWorker()
 	: stopped_(false)
     , queue_(MAX_LOGGING_SIZE) {
 	writterThread_ = std::thread([this] {
+		_alloca(CACHE_LINE_PAD_SIZE);
+
         std::function<void()> action;
 
         lastWriteTime_.reset();
