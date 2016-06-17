@@ -45,7 +45,7 @@ protected:
 	virtual void doSerialize(rapid::IoBuffer *pBuffer) override;
 
 private:
-	WebSocketOpcodes opCode_;
+	WebSocketOpcodes opcode_;
 };
 
 class WebSocketResponse : public MessageContext {
@@ -78,7 +78,7 @@ public:
 
 	void reset();
 
-	WebSocketOpcodes getOpCode() const;
+	WebSocketOpcodes opcode() const;
 
 private:
 

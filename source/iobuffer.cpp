@@ -29,6 +29,7 @@ IoBuffer::IoBuffer()
 	: writeIndex_(0)
 	, readIndex_(0)
 	, prependable_(0) {
+	isCompleted_ = false;
 }
 
 IoBuffer::IoBuffer(uint32_t prependSize, details::BlockFactory &factory)
@@ -36,6 +37,7 @@ IoBuffer::IoBuffer(uint32_t prependSize, details::BlockFactory &factory)
 	, readIndex_(prependSize)
 	, prependable_(prependSize)
 	, buffer_(factory.getBlock(), factory.getAllocator()) {
+	isCompleted_ = false;
 }
 
 IoBuffer::~IoBuffer() {
@@ -116,6 +118,8 @@ char const * IoBuffer::peek() const {
 }
 
 bool IoBuffer::send(std::shared_ptr<Connection> pConn) {
+	isCompleted_ = false;
+
 	if (isEmpty()) {
 		return true;
 	}
@@ -130,10 +134,14 @@ bool IoBuffer::send(std::shared_ptr<Connection> pConn) {
 }
 
 bool IoBuffer::readSome(std::shared_ptr<Connection> pConn) {
+	isCompleted_ = false;
+
 	return readSome(pConn, goodSize());
 }
 
 bool IoBuffer::readSome(std::shared_ptr<Connection> pConn, uint32_t requireSize) {
+	isCompleted_ = false;
+
     makeWriteableSpace(requireSize);    
 	resetOverlappedValue();    
 	uint32_t numBytesRecv = 0;	

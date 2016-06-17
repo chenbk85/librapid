@@ -82,34 +82,34 @@ static void writeWebSocketHeader(rapid::IoBuffer* pBuffer, uint64_t contentLengt
 }
 
 WebSocketRequest::WebSocketRequest()
-	: opCode_(WebSocketOpcodes::WS_OP_CLOSED) {
+	: opcode_(WebSocketOpcodes::WS_OP_CLOSED) {
 }
 
 WebSocketRequest::~WebSocketRequest() noexcept {
 }
 
 bool WebSocketRequest::isClosed() const noexcept {
-	return opCode_ == WS_OP_CLOSED;
+	return opcode_ == WS_OP_CLOSED;
 }
 
 void WebSocketRequest::setOpcode(WebSocketOpcodes opCode) noexcept {
-	opCode_ = opCode;
+	opcode_ = opCode;
 }
 
 bool WebSocketRequest::isTextFormat() const noexcept {
-	return opCode_ == WS_OP_TEXT;
+	return opcode_ == WS_OP_TEXT;
 }
 
 bool WebSocketRequest::isBinaryFormat() const noexcept {
-	return opCode_ == WS_OP_BINARY;
+	return opcode_ == WS_OP_BINARY;
 }
 
 bool WebSocketRequest::isPing() const noexcept {
-	return opCode_ == WS_OP_PING;
+	return opcode_ == WS_OP_PING;
 }
 
 bool WebSocketRequest::isPong() const noexcept {
-	return opCode_ == WS_OP_PONG;
+	return opcode_ == WS_OP_PONG;
 }
 
 void WebSocketRequest::doSerialize(rapid::IoBuffer* pBuffer) {
@@ -154,7 +154,7 @@ void WebSocketFrameReader::reset() {
 	totalReadBytes_ = 0;
 }
 
-WebSocketOpcodes WebSocketFrameReader::getOpCode() const {
+WebSocketOpcodes WebSocketFrameReader::opcode() const {
 	return opcode_;
 }
 
@@ -282,7 +282,7 @@ void WebSocketCodec::readLoop(rapid::ConnectionPtr &pConn, uint32_t &bytesToRead
 	
 	reader_.readFrame(pBuffer, bytesToRead);
 	if (!bytesToRead) {
-		pWebSocketRequest_->setOpcode(reader_.getOpCode());
+		pWebSocketRequest_->setOpcode(reader_.opcode());
 		dispatcher_->onMessage(WS_MESSAGE, pConn, pWebSocketRequest_);
 		reader_.reset();
 	}

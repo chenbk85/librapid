@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <atomic>
 
 #include <rapid/platform/platform.h>
 #include <rapid/details/ioflags.h>
@@ -119,10 +120,12 @@ private:
     uint32_t prependable_;
 	details::Buffer buffer_;
 	std::function<void(ConnectionPtr&)> handler_;
+	std::atomic<bool> mutable isCompleted_;
 };
 
 __forceinline bool IoBuffer::isCompleted() const noexcept {
-	return HasOverlappedIoCompleted(this);
+	//return HasOverlappedIoCompleted(this);
+	return isCompleted_;
 }
 
 template <typename EventHandler>
@@ -131,6 +134,7 @@ __forceinline void IoBuffer::setCompleteHandler(EventHandler &&handler) noexcept
 }
 
 __forceinline void IoBuffer::onComplete(ConnectionPtr &pConn) const {
+	isCompleted_ = true;
 	handler_(pConn);
 }
 
