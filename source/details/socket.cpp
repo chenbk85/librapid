@@ -111,12 +111,12 @@ int CommunicatingSocket::recv(void *buffer, int bufferLen) const {
 }
 
 SocketAddress CommunicatingSocket::getForeignAddress() const {
-    sockaddr_storage addr;
-    socklen_t addrLen = sizeof(addr);
-    if (::getpeername(sockDesc_, reinterpret_cast<sockaddr *>(&addr), static_cast<socklen_t *>(&addrLen)) < 0) {
+    sockaddr_storage address;
+    socklen_t addrLen = sizeof(address);
+    if (::getpeername(sockDesc_, reinterpret_cast<sockaddr *>(&address), static_cast<socklen_t *>(&addrLen)) < 0) {
         throw SocketException("Fetch of foreign address failed (getpeername())");
     }
-    return SocketAddress(reinterpret_cast<sockaddr *>(&addr), addrLen);
+    return SocketAddress(reinterpret_cast<sockaddr *>(&address), addrLen);
 }
 
 void CommunicatingSocket::connect(std::string const &foreignAddress, unsigned short foreignPort) const {

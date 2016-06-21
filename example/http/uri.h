@@ -15,9 +15,11 @@ class Uri {
 public:
 	Uri()
 		: valid_(false) {
+		memset(&parser_, 0, sizeof(parser_));
 	}
 
-	explicit Uri(std::string const &str) {
+	explicit Uri(std::string const &str)
+		: valid_(false) {
 		fromString(str);
 	}
 

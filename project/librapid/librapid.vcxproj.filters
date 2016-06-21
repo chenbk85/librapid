@@ -237,9 +237,6 @@
     <ClInclude Include="..\..\example\http\websocket\websocketconstants.h">
       <Filter>Source Files\httpserver\websocket</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\rapid\platform\threadpool.h">
-      <Filter>Header Files\platform</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\example\http\websocket\websocketservice.h">
       <Filter>Source Files\httpserver\websocket</Filter>
     </ClInclude>
@@ -324,8 +321,8 @@
     <ClInclude Include="..\..\include\rapid\details\socketacceptpoller.h">
       <Filter>Header Files\details</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\rapid\logging\mpmc_bounded_queue.h">
-      <Filter>Header Files\logging</Filter>
+    <ClInclude Include="..\..\include\rapid\utils\threadpool.h">
+      <Filter>Header Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -458,9 +455,6 @@
     <ClCompile Include="..\..\example\http\websocket\websocketcodec.cpp">
       <Filter>Source Files\httpserver\websocket</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\platform\threadpool.cpp">
-      <Filter>Source Files\platform</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\example\http\websocket\websocketservice.cpp">
       <Filter>Source Files\httpserver\websocket</Filter>
     </ClCompile>
@@ -512,5 +506,9 @@
     <ClCompile Include="..\..\source\details\socketacceptpoller.cpp">
       <Filter>Source Files\details</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="librapid.ruleset" />
   </ItemGroup>
 </Project>

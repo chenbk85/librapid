@@ -47,7 +47,7 @@ TcpServer::~TcpServer() {
 }
 
 void TcpServer::startListening(ContextEventHandler &&callback, uint16_t numaNode) {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	numNumaNode_ = numaNode;
 
@@ -88,7 +88,7 @@ void TcpServer::shutdown() {
 }
 
 void TcpServer::startThreadPool() {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	uint32_t concurrentThreadCount = 0;
 
@@ -126,7 +126,7 @@ void TcpServer::startThreadPool() {
 }
 
 void TcpServer::setProcessAffinity() const {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	platform::setProcessPriorityBoost(true);
 
@@ -149,7 +149,7 @@ void TcpServer::setProcessAffinity() const {
 }
 
 void TcpServer::setSocketPool(uint16_t scaleSocketSize, uint16_t poolSocketSize, size_t bufferSize) {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	pListenSocket_ = std::make_shared<details::TcpServerSocket>(localAddress_, localPort_, SOMAXCONN);
 	

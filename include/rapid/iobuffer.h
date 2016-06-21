@@ -36,7 +36,7 @@ public:
 
     ~IoBuffer();
 
-	bool isCompleted() const noexcept;
+	bool hasCompleted() const noexcept;
 
     uint32_t size() const noexcept;
 
@@ -114,18 +114,18 @@ public:
 	void onComplete(ConnectionPtr &pConn) const;
 
 	details::IOFlags ioFlag;
+
 private:
+	mutable bool hasCompleted_ : 1;
     uint32_t writeIndex_;
     uint32_t readIndex_;
     uint32_t prependable_;
 	details::Buffer buffer_;
 	std::function<void(ConnectionPtr&)> handler_;
-	std::atomic<bool> mutable isCompleted_;
 };
 
-__forceinline bool IoBuffer::isCompleted() const noexcept {
-	//return HasOverlappedIoCompleted(this);
-	return isCompleted_;
+__forceinline bool IoBuffer::hasCompleted() const noexcept {
+	return hasCompleted_;
 }
 
 template <typename EventHandler>
@@ -134,7 +134,7 @@ __forceinline void IoBuffer::setCompleteHandler(EventHandler &&handler) noexcept
 }
 
 __forceinline void IoBuffer::onComplete(ConnectionPtr &pConn) const {
-	isCompleted_ = true;
+	hasCompleted_ = true;
 	handler_(pConn);
 }
 

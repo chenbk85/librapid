@@ -42,9 +42,9 @@ BOOL WINAPI consoleHandler(DWORD consoleEvent) {
 
 void startLogging() {
 #ifdef _DEBUG
-	rapid::logging::startLogging(rapid::logging::Trace);
+	rapid::logging::startLogging(rapid::logging::Info);
 #else
-	rapid::logging::startLogging(rapid::logging::Trace);
+	rapid::logging::startLogging(rapid::logging::Info);
 #endif
 
 	auto pFileLogAppender = std::make_shared<rapid::logging::FileLogAppender>();
@@ -83,17 +83,16 @@ void httpServerMain(int argc, char *argv[]) {
 	pServerTemp->start();
 }
 
-static char const s_serverTitle[] = {
-	"\t _____ _____ _____ _____    _____                      \r\n"
-	"\t|  |  |_   _|_   _|  _  |  |   __|___ ___ _ _ ___ ___  \r\n"
-	"\t|     | | |   | | |   __|  |__   | -_|  _| | | -_|  _| \r\n"
-	"\t|__|__| |_|   |_| |__|     |_____|___|_|  \\_/|___|_|  \r\n"
-	"\t                                  Powered by librapid. \r\n"
-	"\r\n"
-};
+static std::string s_title =
+R"(	 _____ _____ _____ _____    _____                     
+	|  |  |_   _|_   _|  _  |  |   __|___ ___ _ _ ___ ___ 
+	|     | | |   | | |   __|  |__   | -_|  _| | | -_|  _|
+	|__|__| |_|   |_| |__|     |_____|___|_|  \_/|___|_|
+	                            Powered by librapid 2015-2016.
+)";
 
 int main(int argc, char *argv[]) {
-	std::cout << s_serverTitle;
+	std::cout << s_title << std::endl;
 
     startLogging();
 

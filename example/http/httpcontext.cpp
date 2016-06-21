@@ -55,12 +55,12 @@ void HttpContext::setEventHandler() {
 }
 
 void HttpContext::onAcceptConnection(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 	readLoop(pConn);
 }
 
 void HttpContext::handshake(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	setEventHandler();
 	
@@ -78,7 +78,7 @@ void HttpContext::handshake(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::onHttpGetMessage(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
     // HTTP1.1 有些browser需要'Connection'來表示keep-alive!
     // HTTP2 中取消了'Connection' 
@@ -102,7 +102,7 @@ void HttpContext::onHttpGetMessage(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::onHttpPostMessage(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
     // HTTP1.1 有些browser需要'Connection'來表示keep-alive!
     // HTTP2 中取消了'Connection' 
@@ -130,7 +130,7 @@ size_t HttpContext::id() const noexcept {
 }
 
 void HttpContext::readPostData(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	if (pHttpRequest_->writeTempFile(pConn)) {
 		sendMessage(pConn);
@@ -138,7 +138,7 @@ void HttpContext::readPostData(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::readLoop(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	uint32_t bytesToRead = 0;
 	auto pBuffer = pConn->getReceiveBuffer();
@@ -152,7 +152,7 @@ void HttpContext::readLoop(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::sendMessage(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	while (!pHttpResponse_->send(pConn, pHttpRequest_)) {
 		if (!pConn->sendAsync()) {
@@ -166,7 +166,7 @@ void HttpContext::sendMessage(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::sendSwitchToHttp2cMessage(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	if (pHttpRequest_->has(HTTP_CONNECTION)) {
 		auto value = pHttpRequest_->get(HTTP_CONNECTION);
@@ -201,7 +201,7 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 	Sec-WebSocket-Origin: null
 	Sec-WebSocket-Location: ws://example.com/
 	*/
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	pHttpResponse_->setStatusCode(HTTP_SWITCHING_PROTOCOLS);
 	pHttpResponse_->add(HTTP_UPGRADE, HTTP_WEBSOCKET.str());
@@ -240,15 +240,17 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 	// Set handler to read WebSocket data
 	pConn->setSendEventHandler([this, pContext](rapid::ConnectionPtr conn) {
 		pWebSocketService_->onWebSocketOpen(conn, pContext);
+		readLoop(conn);
 	});
 
 	if (pConn->sendAsync()) {
 		pWebSocketService_->onWebSocketOpen(pConn, pContext);
+		readLoop(pConn);
 	}
 }
 
 void HttpContext::onWebSocketMessage(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	if (pWebSocketService_->onWebSocketMessage(pConn, pWebSocketRequest_)) {
 		readLoop(pConn);
@@ -256,7 +258,7 @@ void HttpContext::onWebSocketMessage(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::onDisconnect(rapid::ConnectionPtr &pConn) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	if (pWebSocketService_ != nullptr) {
 		pWebSocketService_->onWebSocketClose(pConn);

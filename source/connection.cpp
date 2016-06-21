@@ -111,7 +111,7 @@ void Connection::updateAcceptContext() {
 }
 
 void Connection::postAsync(std::function<void(ConnectionPtr)> handler) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 	pPostBuffer_->setCompleteHandler(handler);
 	pPostBuffer_->ioFlag = details::IOFlags::IO_POST_PENDDING;
 	details::IoEventDispatcher::getInstance().post(reinterpret_cast<ULONG_PTR>(this), pPostBuffer_.get());
@@ -226,11 +226,11 @@ bool Connection::sendAsync() {
 }
 
 details::SocketAddress const & Connection::getRemoteSocketAddress() const noexcept {
-	return accpetedAddressInfo_.remoteAddess;
+	return accpetedAddress_.remoteAddess;
 }
 
 details::SocketAddress const & Connection::getLocalSocketAddress() const noexcept {
-	return accpetedAddressInfo_.localAddress;
+	return accpetedAddress_.localAddress;
 }
 
 void Connection::sendAndDisconnec() {
@@ -242,7 +242,7 @@ void Connection::sendAndDisconnec() {
 }
 
 void Connection::onSend(IoBuffer *pBuffer, uint32_t bytesTransferred) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 	
 	pBuffer->retrieve(bytesTransferred);
 
@@ -257,7 +257,7 @@ void Connection::onSend(IoBuffer *pBuffer, uint32_t bytesTransferred) {
 }
 
 void Connection::onReceive(IoBuffer *pBuffer, uint32_t bytesTransferred) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	if (bytesTransferred > 0) {
 		pBuffer->advanceWriteIndex(bytesTransferred);
@@ -284,7 +284,7 @@ void Connection::onConnectionError(uint32_t error) {
 }
 
 void Connection::onConnectionReset() {
-	RAPID_LOG_TRACE_FUNC() << " Connection reset!";
+	RAPID_LOG_TRACE_STACK_TRACE() << " Connection reset!";
 	
 	isSendShutdown_ = true;
 	isRecvShutdown_ = true;
@@ -293,9 +293,9 @@ void Connection::onConnectionReset() {
 }
 
 bool Connection::receiveAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBuffer * __restrict pBuffer, uint32_t * __restrict numByteRecv) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
-    DWORD returnFlag = 0;
+	DWORD flags = MSG_PARTIAL;
 
 	pBuffer->ioFlag = details::IOFlags::IO_RECV_PENDDING;
 
@@ -303,7 +303,7 @@ bool Connection::receiveAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBu
                          iovec,
                          numIovec,
                          reinterpret_cast<LPDWORD>(numByteRecv),
-                         &returnFlag,
+                         &flags,
                          pBuffer,
                          nullptr);
 
@@ -324,15 +324,17 @@ bool Connection::receiveAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBu
 }
 
 bool Connection::sendAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBuffer * __restrict pBuffer, uint32_t * __restrict numByteSend) {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	pBuffer->ioFlag = details::IOFlags::IO_SEND_PENDDING;
+
+	DWORD flags = MSG_PARTIAL;
 
     auto ret = ::WSASend(acceptSocket_.socketFd(),
                          iovec,
                          numIovec,
                          reinterpret_cast<LPDWORD>(numByteSend),
-                         0,
+                         flags,
                          pBuffer,
                          nullptr);
 
@@ -404,7 +406,7 @@ uint32_t Connection::getConnectTime() const {
 void Connection::onAcceptConnection(uint32_t acceptSize) {
 	updateAcceptContext();
     
-    getAcceptPairAddress(accpetedAddressInfo_);
+    getAcceptPairAddress(accpetedAddress_);
 
     if (acceptSize > 0) {
         pReceiveBuffer_->advanceWriteIndex(acceptSize);
@@ -429,7 +431,7 @@ void Connection::addReuseTimingWheel() {
 }
 
 void Connection::onDisconnected() {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
 	pDisconnectBuffer_->onComplete(shared_from_this());
 	isReuseSocket_ = true;
 	if (halfClosedState_ == ACTIVE_CLOSE) {
@@ -443,7 +445,7 @@ void Connection::onDisconnected() {
 }
 
 void Connection::disconnect() {
-	RAPID_LOG_TRACE_FUNC();
+	RAPID_LOG_TRACE_STACK_TRACE();
     if (disconnectAsync()) {
         onDisconnected();
     }

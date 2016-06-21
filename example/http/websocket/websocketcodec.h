@@ -41,11 +41,18 @@ public:
 
 	bool isPong() const noexcept;
 
+	uint64_t getConetentLength() const noexcept;
+
+	std::string content() const;
+
+	void setContent(std::string const &content);
+
 protected:
 	virtual void doSerialize(rapid::IoBuffer *pBuffer) override;
 
 private:
 	WebSocketOpcodes opcode_;
+	std::string content_;
 };
 
 class WebSocketResponse : public MessageContext {
@@ -72,13 +79,13 @@ public:
 
 	WebSocketFrameReader();
 	
-	uint64_t getConetentLength() const;
+	uint64_t getConetentLength() const noexcept;
 
 	void readFrame(rapid::IoBuffer* buffer, uint32_t &wantReadSize);
 
-	void reset();
+	void reset() noexcept;
 
-	WebSocketOpcodes opcode() const;
+	WebSocketOpcodes opcode() const noexcept;
 
 private:
 
@@ -90,7 +97,7 @@ private:
 
 	void maskData(rapid::IoBuffer *buffer);
 
-	size_t getMaskSize() const;
+	size_t getMaskSize() const noexcept;
 
 	bool lastFrame_ : 1;
 	bool isMasked_ : 1;

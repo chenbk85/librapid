@@ -17,7 +17,7 @@ namespace details {
 
 class Buffer {
 public:
-	Buffer() = default;
+	Buffer();
 
     Buffer(Block const &block, MemAllocatorPtr allocator);
 

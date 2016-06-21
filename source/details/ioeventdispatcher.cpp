@@ -57,12 +57,12 @@ void IoEventDispatcher::postQuit() const {
 }
 
 void IoEventDispatcher::waitForIoLoop(uint32_t timeout) const {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
 	// NOTE: 
 	// IOCP 並行的機會發生在此!
 	// TCP是全雙工的, 但是程式無法並行去處理, 所以最佳的做法是讓上層把buffer填滿,
-	// 並透過底層並行的消耗buffer!
+	// 並透過IOCP並行的消耗buffer!
 
     OVERLAPPED_ENTRY entries[MAX_OVERLAPPED_ENTRIES];
     ULONG removeCount;
@@ -80,7 +80,6 @@ void IoEventDispatcher::waitForIoLoop(uint32_t timeout) const {
 		for (ULONG i = 0; i < removeCount; ++i) {
 			Connection *pConn = nullptr;
 			IoBuffer *pBuffer = nullptr;
-
             if (entries[i].lpCompletionKey == 0) {
                 // Accept new connection.
 				pConn = static_cast<Connection*>(entries[i].lpOverlapped);
@@ -92,7 +91,7 @@ void IoEventDispatcher::waitForIoLoop(uint32_t timeout) const {
 				pConn = reinterpret_cast<Connection*>(entries[i].lpCompletionKey);
 				pBuffer = static_cast<IoBuffer*>(entries[i].lpOverlapped);
             }
-			
+			RAPID_LOG_TRACE() << entries[i].dwNumberOfBytesTransferred << " bytes transferred ";
 			pConn->onIoCompletion(pBuffer, entries[i].dwNumberOfBytesTransferred);
         }
     }

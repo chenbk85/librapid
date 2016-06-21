@@ -10,7 +10,8 @@
 #include <rapid/platform/performancecounter.h>
 #include <rapid/platform/utils.h>
 #include <rapid/logging/logging.h>
-#include <rapid/logging/mpmc_bounded_queue.h>
+#include <rapid/utils/mpmc_bounded_queue.h>
+#include <rapid/utils/threadpool.h>
 #include <rapid/platform/spinlock.h>
 #include <rapid/details/timingwheel.h>
 #include <rapid/utils/stopwatch.h>
@@ -39,7 +40,7 @@ public:
 
 		pTimer_->start([pConn, this]() {
 			auto pBuffer = pConn->getSendBuffer();
-			if (!pBuffer->isCompleted()) {
+			if (!pBuffer->hasCompleted()) {
 				return;
 			}
 
@@ -106,148 +107,293 @@ static std::string const MSG_TYPE_ID = "id";
 static std::string const MSG_TYPE_MESSAGE = "message";
 static std::string const MSG_TYPE_USERNAME = "username";
 static std::string const MSG_TYPE_USERLIST = "userlist";
-static uint32_t constexpr MSG_MAX_SIZE = 4096;
 
-class WebSocketServerPusher : public rapid::utils::Singleton<WebSocketServerPusher> {
+struct Message {
+	static const Message EMPTY_MESSAGE;
+
+	Message()
+		: messageId(-1)
+		, liveTime(-1) {
+	}
+
+	explicit Message(int id, std::string const &message)
+		: messageId(id)
+		, liveTime(0)
+		, content(message) {
+	}
+
+	bool operator==(Message const &message) {
+		return messageId == message.messageId;
+	}
+
+	int messageId;
+	int liveTime;
+	std::string content;
+};
+
+const Message Message::EMPTY_MESSAGE;
+
+static uint32_t makeUniqueUid() {
+	static std::atomic<uint32_t> uid = 0;
+	return ++uid;
+}
+
+static uint32_t makeUniqueMessageId() {
+	static std::atomic<uint32_t> messageId = 0;
+	return ++messageId;
+}
+
+class BroadcastChannel {
 public:
-	WebSocketServerPusher()
-		: messages_(MSG_MAX_SIZE)
-		, pumpThread_([this]() { messageListenerLoop(); }) {
+	explicit BroadcastChannel(std::string const &name)
+		: name_(name)
+		, maxExpireSecs_(INT_MAX) {
 	}
 
-	void subscribe(int id, rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) {
-		std::lock_guard<rapid::platform::Spinlock> guard{
-			lock_
-		};
-
-		userlist_[id] = std::make_pair(pConn, pContext);
+	std::string name() const {
+		return name_;
 	}
 
-	void unSubscribe(int id) {
-		std::lock_guard<rapid::platform::Spinlock> guard{
-			lock_
-		};
-
-		usernames_.erase(id);
-		userlist_.erase(id);
+	void subscribe(std::string const &client) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		subscribers_[client] = 0;
 	}
 
-	void setUsername(int uid, std::string const &username) {
-		std::lock_guard<rapid::platform::Spinlock> guard{
-			lock_
-		};
-
-		usernames_[uid] = username;
+	void unSubscribe(std::string const &client) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		subscribers_.erase(client);
 	}
 
-	std::vector<std::string> getUserlist() {
-		std::lock_guard<rapid::platform::Spinlock> guard{
-			lock_
-		};
-
-		std::vector<std::string> userlist;
-		userlist.reserve(usernames_.size());
-
-		for (auto &pair : usernames_)
-			userlist.push_back(pair.second);
-
-		return userlist;
+	void dequeue(std::string const &key) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		auto ret = messages_.erase(key);	
 	}
 
-	void submitMessage(std::vector<std::string> &messages) {
-		messages_.enqueue(std::move(messages));
-	}
-
-	void sendMessage(rapid::ConnectionPtr &pConn, std::vector<std::string> const &messages) {
-		auto pBuffer = pConn->getSendBuffer();
-
-		for (auto const &message : messages) {
-			WebSocketResponse response;
-			response.setContentLength(message.length());
-			response.serialize(pBuffer);
-			pBuffer->append(message.c_str(), message.length());
+	void enqueue(std::string const &key, std::string const &message) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		auto id = makeUniqueMessageId();
+		if (!key.empty()) {
+			messages_[key] = Message(id, message);
+		} else {
+			messages_[std::to_string(id)] = Message(id, message);
 		}
-
-		pConn->sendAsync();
 	}
 
-	void messageListenerLoop() {
-		updateTime_.reset();
+	Message getNextMessage() const {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		for (auto const & message : messages_) {
+			return message.second;
+		}
+		return Message::EMPTY_MESSAGE;
+	}
 
-		while (true) {
-			std::vector<std::string> messages;
-
-			if (!messages_.dequeue(messages)) {
-				auto elapsed = updateTime_.elapsed<std::chrono::microseconds>();
-				if (elapsed <= std::chrono::microseconds(50)) {
-					continue;
+	Message getNextMessage(int messageId, int liveTime) const {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		for (auto const & message : messages_) {
+			if (message.second.messageId >= messageId) {
+				if (maxExpireSecs_ == 0
+					|| liveTime <= maxExpireSecs_) {
+					return message.second;
 				}
-				if (elapsed <= std::chrono::microseconds(100)) {
-					std::this_thread::yield();
-					continue;
-				}
-				if (elapsed <= std::chrono::milliseconds(200)) {
-					std::this_thread::sleep_for(std::chrono::milliseconds(200));
-					continue;
-				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(200));
-				continue;
 			}
+		}
+		return Message::EMPTY_MESSAGE;
+	}
 
-			updateTime_.reset();
+private:
+	mutable rapid::platform::Spinlock lock_;
+	int maxExpireSecs_;
+	std::string name_;
+	std::map<std::string, int> subscribers_;
+	std::map<std::string, Message> messages_;
+};
 
-			std::lock_guard<rapid::platform::Spinlock> guard{
-				lock_
-			};
+class BroadcastChannelManager {
+public:
+	BroadcastChannelManager() {
 
+	}
+
+	void addChannle(std::string const &channelName) {
+		channels_[channelName] = std::make_shared<BroadcastChannel>(channelName);
+	}
+
+	void removeChannel(std::string const &channelName) {
+		channels_.erase(channelName);
+	}
+
+	std::shared_ptr<BroadcastChannel> getChannel(std::string const &channelName) {
+		return channels_[channelName];
+	}
+
+	void pushMessage(std::string const &channelName, 
+		std::string const &key,
+		std::string const &message) {
+		onStartupChannel(channelName);
+		channels_[channelName]->enqueue(key, message);
+		onActiveSubscribers(channelName);
+	}
+
+	void pushMessage(std::string const &channelName,
+		int key,
+		std::string const &message) {
+		pushMessage(channelName, std::to_string(key), message);
+	}
+
+	void removeMessage(std::string const &channelName, int key) {
+		channels_[channelName]->dequeue(std::to_string(key));
+	}
+
+	void removeMessage(std::string const &channelName,
+		std::string const &key) {
+		channels_[channelName]->dequeue(key);
+	}
+
+protected:
+	virtual void onStartupChannel(std::string const &channelName) {
+	}
+
+	virtual void onActiveSubscribers(std::string const &channelName) {
+	}
+
+private:
+	std::unordered_map<std::string, std::shared_ptr<BroadcastChannel>> channels_;
+};
+
+static rapid::platform::Spinlock s_lock;
+static std::unordered_map<int, std::string> s_userlist;
+
+static void addUserlist(int id, std::string const &name) {
+	std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+	s_userlist[id] = name;
+}
+
+static void removeUserlist(int id) {
+	std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+	s_userlist.erase(id);
+}
+
+static std::vector<int> getUserIdList() {
+	std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+
+	std::vector<int> userlist;
+	for (auto &user : s_userlist) {
+		userlist.push_back(user.first);
+	}
+	return userlist;
+}
+
+static std::vector<std::string> getUserlist() {
+	std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+
+	std::vector<std::string> userlist;
+	for (auto &user : s_userlist) {
+		userlist.push_back(user.second);
+	}
+	return userlist;
+}
+
+class MessagePusher : public rapid::utils::Singleton<MessagePusher> {
+public:
+	MessagePusher() 
+		: stopped_(false)
+		, pushThread_([this]() { pushMessageLoop(); }) {
+	}
+
+	MessagePusher(MessagePusher const &) = delete;
+	MessagePusher& operator=(MessagePusher const &) = delete;
+
+	~MessagePusher() {
+		stopped_ = true;
+		if (pushThread_.joinable())
+			pushThread_.join();
+	}
+
+	void subscribe(std::string const &name, rapid::ConnectionPtr &pConn) {
+		RAPID_LOG_TRACE_STACK_TRACE();
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		userlist_[name] = pConn;
+		mananger_.addChannle(name);
+	}
+
+	void unSubscribe(std::string const &name) {
+		RAPID_LOG_TRACE_STACK_TRACE();
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		userlist_.erase(name);
+		mananger_.removeChannel(name);
+	}
+
+	void pushAll(std::string const &message) {
+		RAPID_LOG_TRACE_STACK_TRACE();
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		auto userIdList = getUserIdList();
+		for (auto const &uid : userIdList) {
+			mananger_.pushMessage(std::to_string(uid), "", message);
+		}
+	}
+
+	void push(std::string const &name, std::string const &message) {
+		RAPID_LOG_TRACE_STACK_TRACE();
+		mananger_.pushMessage(name, "", message);
+	}
+
+private:
+	void pushMessageLoop() {
+		rapid::utils::ThreadPool pool;
+		while (!stopped_) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 			for (auto &user : userlist_) {
-				auto pBuffer = user.second.first->getSendBuffer();
-
-				if (pBuffer->isCompleted()) {
-					sendMessage(user.second.first, std::move(messages));
-				} else {
-					user.second.first->postAsync([messages, this](rapid::ConnectionPtr &pConn) {
-						sendMessage(pConn, messages);
-					});
-				}
+				pool.excute([user, this]() {
+					auto message = mananger_.getChannel(user.first)->getNextMessage();
+					if (message == Message::EMPTY_MESSAGE)
+						return;
+					auto pBuffer = user.second->getSendBuffer();
+					if (!pBuffer->hasCompleted())
+						return;
+					RAPID_LOG_TRACE() << "Send Message " << message.messageId << std::endl << message.content;
+					WebSocketResponse resp;
+					resp.setContentLength(message.content.length());
+					resp.serialize(pBuffer);
+					pBuffer->append(message.content);
+					user.second->sendAsync();
+					mananger_.removeMessage(user.first, message.messageId);
+				});				
 			}
 		}
 	}
 
 	mutable rapid::platform::Spinlock lock_;
-	mpmc_bounded_queue<std::vector<std::string>> messages_;
-	std::unordered_map<int, std::string> usernames_;
-	std::unordered_map<int, std::pair<rapid::ConnectionPtr, std::shared_ptr<HttpContext>>> userlist_;
-	rapid::utils::SystemStopwatch updateTime_;
-	std::thread pumpThread_;
+	bool stopped_;
+	std::unordered_map<std::string, rapid::ConnectionPtr> userlist_;
+	BroadcastChannelManager mananger_;	
+	std::thread pushThread_;
 };
 
 class WebSocketChatService : public WebSocketService {
 public:
-	struct Message {
+	struct ChatMessage {
 		std::string types;
 		std::string id;
 		int64_t date;
 		std::string content;
 	};
 
-	WebSocketChatService() {
+	WebSocketChatService()
+		: uid_(makeUniqueUid()) {
 	}
 
 	virtual ~WebSocketChatService() {
-
 	}
 
 	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
-		uid_ = time(nullptr);
-		writeUid(uid_);
-
-		pConn->setSendEventHandler([this, pContext](rapid::ConnectionPtr &conn) {
-			pContext->readLoop(conn);
+		MessagePusher::getInstance().subscribe(std::to_string(uid_), pConn);
+		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
+			auto pBuffer = conn->getReceiveBuffer();
+			if (pBuffer->hasCompleted())
+				pContext->readLoop(conn);
 		});
-
-		WebSocketServerPusher::getInstance().subscribe(uid_, pConn, pContext);
-		WebSocketServerPusher::getInstance().submitMessage(messages_);
+		addUidMessage(uid_);
 	}
 
 	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
@@ -255,53 +401,43 @@ public:
 			onWebSocketClose(pConn);
 			return false; // ¤£Ä~ÄòÅª¨ú!
 		}
-
-		auto pBuffer = pConn->getReceiveBuffer();
-		if (pBuffer->isEmpty())
-			return true;
-
-		auto message = parse(pBuffer);
-
+		auto message = parse(webSocketRequest->content());
 		if (message.types == MSG_TYPE_USERNAME) {			
 			username_ = message.content;
-			WebSocketServerPusher::getInstance().setUsername(uid_, username_);
-			addUsernameMessage(username_);
-			addUserListMessage(WebSocketServerPusher::getInstance().getUserlist());
+			addUserlist(uid_, username_);
+			addUserLoginMessage(username_);
+			updateUserlistMessage(getUserlist());
 		} else if (message.types == MSG_TYPE_MESSAGE) {
-			addChatMessage(username_, message.content);
+			addChatRoomMessage(username_, message.content);
 		}
-
-		WebSocketServerPusher::getInstance().submitMessage(messages_);
-		return false;
+		return true;
 	}
 
 	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
-		WebSocketServerPusher::getInstance().unSubscribe(uid_);
-		addUserListMessage(WebSocketServerPusher::getInstance().getUserlist());
-		WebSocketServerPusher::getInstance().submitMessage(messages_);
+		MessagePusher::getInstance().unSubscribe(username_);
+		removeUserlist(uid_);
+		updateUserlistMessage(getUserlist());
 	}
 
 private:
-	void addMember(rapidjson::Document &doc, std::string const &key, std::string const &value) {
+	static void addMember(rapidjson::Document &doc, std::string const &key, std::string const &value) {
 		rapidjson::Value object(rapidjson::Type::kObjectType);
 		object.SetString(value.c_str(), doc.GetAllocator());
-
 		rapidjson::Value keyobject(rapidjson::Type::kStringType);
 		keyobject.SetString(key.c_str(), key.length(), doc.GetAllocator());
 		doc.AddMember(keyobject, object, doc.GetAllocator());
 	}
 
-	void addMember(rapidjson::Document &doc, std::string const &key, int64_t const &value) {
+	static void addMember(rapidjson::Document &doc, std::string const &key, int64_t const &value) {
 		rapidjson::Value object(rapidjson::Type::kObjectType);
 		object.SetInt64(value);
-
 		rapidjson::Value keyobject(rapidjson::Type::kStringType);
 		keyobject.SetString(key.c_str(), key.length(), doc.GetAllocator());
 		doc.AddMember(keyobject, object, doc.GetAllocator());
 	}
 
-	void writeUid(int uid) {
-		messages_.push_back(createMessage([this, uid](rapidjson::Document &doc) {
+	void addUidMessage(int uid) {
+		MessagePusher::getInstance().push(std::to_string(uid_), makeMessage([this, uid](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_ID);
 			addMember(doc, "id", std::to_string(uid));
 			addMember(doc, "date", time(nullptr));
@@ -309,75 +445,70 @@ private:
 	}
 
 	template <typename Lambda>
-	std::string createMessage(Lambda &&addMemberHandler) {
+	std::string makeMessage(Lambda &&addMemberHandler) {
 		rapidjson::Document doc(rapidjson::Type::kObjectType);
-
 		addMemberHandler(doc);
-
 		rapidjson::StringBuffer buffer;
 		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 		doc.Accept(writer);
-
 		return std::string(buffer.GetString(), buffer.GetSize());
 	}
 
-	void addUsernameMessage(std::string const &username) {
-		messages_.push_back(createMessage([this, username](rapidjson::Document &doc) {
+	void addUserLoginMessage(std::string const &username) {
+		MessagePusher::getInstance().pushAll(makeMessage([username](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_USERNAME);
 			addMember(doc, "name", username);
 			addMember(doc, "date", time(nullptr));
 		}));
 	}
 
-	void addChatMessage(std::string const &username, std::string const &text) {
-		messages_.push_back(createMessage([this, username, text](rapidjson::Document &doc) {
+	void addChatRoomMessage(std::string const &username, std::string const &message) {
+		MessagePusher::getInstance().pushAll(makeMessage([username, message](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_MESSAGE);
 			addMember(doc, "name", username);
 			addMember(doc, "date", time(nullptr));
-			addMember(doc, "text", text);
+			addMember(doc, "text", message);
 		}));
 	}
 
-	void addUserListMessage(std::vector<std::string> const &userlist) {
-		messages_.push_back(createMessage([this, userlist](rapidjson::Document &doc) {
+	void updateUserlistMessage(std::vector<std::string> const &userlist) {
+		RAPID_LOG_TRACE_STACK_TRACE();
+		MessagePusher::getInstance().pushAll(makeMessage([userlist](rapidjson::Document &doc) {
 			rapidjson::Value array(rapidjson::kArrayType);
-
 			addMember(doc, "type", MSG_TYPE_USERLIST);
-
 			for (auto const &user : userlist) {
 				rapidjson::Value object(rapidjson::kObjectType);
 				object.SetString(user.c_str(), user.length());
 				array.PushBack(object, doc.GetAllocator());
 			}
-
 			doc.AddMember("users", array, doc.GetAllocator());
 		}));
 	}
 
-	Message parse(rapid::IoBuffer *pBuffer) {
-		auto data = pBuffer->read(pBuffer->readable());
-
-		RAPID_LOG_TRACE() << "Chat Debug (" << data.length() << ")\r\n" << data;
-
+	ChatMessage parse(std::string const &data) {
+		RAPID_LOG_TRACE() << "Receive Message" << std::endl << data;
 		rapidjson::Document doc;
 		doc.Parse(data.c_str());
 		if (doc.HasParseError()) {
-			throw rapid::Exception("Parse json 45error");
+			throw rapid::Exception("Parse json error");
 		}
-
+		// Make sure json format
 		auto id = doc.FindMember("id");
+		RAPID_ENSURE(id != doc.MemberEnd());
 		auto type = doc.FindMember("type");
+		RAPID_ENSURE(type != doc.MemberEnd());
 		auto date = doc.FindMember("date");
+		RAPID_ENSURE(date != doc.MemberEnd());
 		std::string content;
-
 		if ((*type).value.GetString() == MSG_TYPE_USERNAME) {
 			auto name = doc.FindMember("name");
+			RAPID_ENSURE(name != doc.MemberEnd());
 			content = (*name).value.GetString();
 		} else if ((*type).value.GetString() == MSG_TYPE_MESSAGE) {
 			auto text = doc.FindMember("text");
+			RAPID_ENSURE(text != doc.MemberEnd());
 			content = (*text).value.GetString();
 		}
-
 		return {
 			(*type).value.GetString(),
 			(*id).value.GetString(),
@@ -386,8 +517,7 @@ private:
 		};
 	}
 	
-	std::vector<std::string> messages_;
-	int uid_;
+	uint32_t uid_;
 	std::string username_;
 };
 

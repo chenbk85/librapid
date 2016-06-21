@@ -20,7 +20,7 @@
 #include <rapid/utils/stringutilis.h>
 #include <rapid/utils/stopwatch.h>
 
-#include <rapid/logging/mpmc_bounded_queue.h>
+#include <rapid/utils/mpmc_bounded_queue.h>
 #include <rapid/logging/timestamp.h>
 #include <rapid/logging/stackdump.h>
 #include <rapid/logging/logging.h>
@@ -109,11 +109,8 @@ LoggingWorker::LoggingWorker()
     , queue_(MAX_LOGGING_SIZE) {
 	writterThread_ = std::thread([this] {
 		_alloca(CACHE_LINE_PAD_SIZE);
-
-        std::function<void()> action;
-
-        lastWriteTime_.reset();
-		
+		std::function<void()> action;
+        lastWriteTime_.reset();		
         while (!stopped_) {
             if (!queue_.dequeue(action)) {
                 auto lastWriteTime = lastWriteTime_.elapsed<std::chrono::microseconds>();
@@ -179,7 +176,7 @@ std::ostream& DefaultLogFormatter::format(std::ostream &ostr, LogEntry const &en
 		<< "] "
 		<< entry.timestamp
 		<< std::setfill(' ')
-		<< std::setw(5) << LogLevelNameTable[entry.level]
+		<< std::setw(6) << LogLevelNameTable[entry.level]
 		<< " * "
 		<< entry.message;
     return ostr;

@@ -53,11 +53,11 @@ int SSLManager::onAPLNSelect(SSL* pSSL,
 	for (; end > in;) {
 		int protoLen = *in;
 		std::string const protocol(reinterpret_cast<char const*>(in + 1), protoLen);
-		RAPID_LOG_TRACE_FUNC() << "APLN: Client support protocol= " << protocol;
+		RAPID_LOG_TRACE_STACK_TRACE() << "APLN: Client support protocol= " << protocol;
 		if (protocol == pSSLManager->alpnProtocols_) {
 			*out = reinterpret_cast<const unsigned char*>(pSSLManager->alpnProtocols_.data());
 			*outlen = pSSLManager->alpnProtocols_.length();
-			RAPID_LOG_TRACE_FUNC() << "APLN: Sever select protocol= " << protocol;
+			RAPID_LOG_TRACE_STACK_TRACE() << "APLN: Sever select protocol= " << protocol;
 			return SSL_TLSEXT_ERR_OK;
 		}
 		in += protoLen + 1;

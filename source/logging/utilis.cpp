@@ -62,7 +62,7 @@ void ConsoleOutputLogAppender::write(LogFormatter &format, LogEntry const &recor
 		<< "] "
 		<< record.timestamp
 		<< std::setfill(' ')
-		<< std::setw(5)
+		<< std::setw(6)
 		<< LogLevelNameTable[record.level];
 
     switch (record.level) {
@@ -138,12 +138,9 @@ void ConsoleOutputLogAppender::setWindowSize(size_t width, size_t height) {
 	rect.Left = 0;
 	rect.Top = 0;
 
-	if (width >= 80)
-	{
+	if (width >= 80) {
 		rect.Right = newConsoleScreenBufferInfo.dwMaximumWindowSize.X - 1;
-	}
-	else
-	{
+	} else {
 		rect.Right = (width << 1);
 	}
 

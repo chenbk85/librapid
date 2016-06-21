@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.props" Condition="Exists('..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.props')" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -73,6 +74,8 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Program Files (x86)\Visual Leak Detector\include;</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Program Files (x86)\Visual Leak Detector\lib\Win64</LibraryPath>
+    <CodeAnalysisRuleSet>C:\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Static Analysis Tools\Rule Sets\NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -109,6 +112,8 @@
       </DisableSpecificWarnings>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <EnablePREfast>false</EnablePREfast>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -235,7 +240,6 @@
     <ClInclude Include="..\..\include\rapid\iobuffer.h" />
     <ClInclude Include="..\..\include\rapid\logging\eventlog.h" />
     <ClInclude Include="..\..\include\rapid\logging\logging.h" />
-    <ClInclude Include="..\..\include\rapid\logging\mpmc_bounded_queue.h" />
     <ClInclude Include="..\..\include\rapid\logging\stackdump.h" />
     <ClInclude Include="..\..\include\rapid\logging\timestamp.h" />
     <ClInclude Include="..\..\include\rapid\objectpool.h" />
@@ -251,7 +255,6 @@
     <ClInclude Include="..\..\include\rapid\platform\srwlock.h" />
     <ClInclude Include="..\..\include\rapid\platform\synchronousqueue.h" />
     <ClInclude Include="..\..\include\rapid\platform\tcpipparameters.h" />
-    <ClInclude Include="..\..\include\rapid\platform\threadpool.h" />
     <ClInclude Include="..\..\include\rapid\platform\threadutils.h" />
     <ClInclude Include="..\..\include\rapid\platform\utils.h" />
     <ClInclude Include="..\..\include\rapid\connection.h" />
@@ -264,6 +267,7 @@
     <ClInclude Include="..\..\include\rapid\utils\singleton.h" />
     <ClInclude Include="..\..\include\rapid\utils\stopwatch.h" />
     <ClInclude Include="..\..\include\rapid\utils\stringutilis.h" />
+    <ClInclude Include="..\..\include\rapid\utils\threadpool.h" />
     <ClInclude Include="..\..\thirdparty\libzippp\src\libzippp.h" />
   </ItemGroup>
   <ItemGroup>
@@ -319,7 +323,6 @@
     <ClCompile Include="..\..\source\platform\registry.cpp" />
     <ClCompile Include="..\..\source\platform\exception.cpp" />
     <ClCompile Include="..\..\source\platform\tcpipparameters.cpp" />
-    <ClCompile Include="..\..\source\platform\threadpool.cpp" />
     <ClCompile Include="..\..\source\platform\threadutils.cpp" />
     <ClCompile Include="..\..\source\platform\utils.cpp" />
     <ClCompile Include="..\..\source\connection.cpp" />
@@ -329,7 +332,21 @@
     <ClCompile Include="..\..\thirdparty\MurmurHash3\MurmurHash3.cpp" />
     <ClCompile Include="..\..\thirdparty\picohttpparser\picohttpparser.c" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="librapid.ruleset" />
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\Microsoft.Gsl.0.1.2.1\build\native\Microsoft.Gsl.targets" Condition="Exists('..\packages\Microsoft.Gsl.0.1.2.1\build\native\Microsoft.Gsl.targets')" />
+    <Import Project="..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.targets" Condition="Exists('..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Microsoft.Gsl.0.1.2.1\build\native\Microsoft.Gsl.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Gsl.0.1.2.1\build\native\Microsoft.Gsl.targets'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.props'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CppCoreCheck.14.0.23917.2\build\native\Microsoft.CppCoreCheck.targets'))" />
+  </Target>
 </Project>

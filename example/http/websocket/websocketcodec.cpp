@@ -49,7 +49,7 @@ std::string getWebsocketAcceptKey(std::string const &key) {
 +---------------------------------------------------------------+
 
 */
-static void writeWebSocketHeader(rapid::IoBuffer* pBuffer, uint64_t contentLength_) {
+static void writeWebSocketHeader(rapid::IoBuffer* pBuffer, uint64_t contentLength) {
 	pBuffer->makeWriteableSpace(WS_MIN_SIZE);
 
 	auto extendedLength = 0;
@@ -60,9 +60,9 @@ static void writeWebSocketHeader(rapid::IoBuffer* pBuffer, uint64_t contentLengt
 	// Not set mask bit, browser don't support mask.
 	uint8_t byteSecond = 0x00;
 
-	if (contentLength_ <= WS_NO_EXT_PAYLOAD_LENGTH_MAX) {
-		byteSecond = contentLength_;
-	} else if (contentLength_ <= UINT16_MAX) {
+	if (contentLength <= WS_NO_EXT_PAYLOAD_LENGTH_MAX) {
+		byteSecond = contentLength;
+	} else if (contentLength <= UINT16_MAX) {
 		byteSecond |= WS_16BIT_EXT_PAYLOAD_LENGTH;
 		extendedLength = sizeof(uint16_t);
 	} else {
@@ -74,10 +74,10 @@ static void writeWebSocketHeader(rapid::IoBuffer* pBuffer, uint64_t contentLengt
 
 	if (extendedLength == sizeof(uint16_t)) {
 		pBuffer->makeWriteableSpace(sizeof(uint16_t));
-		rapid::writeData<rapid::utils::BigEndian>(pBuffer, static_cast<uint16_t>(contentLength_));
+		rapid::writeData<rapid::utils::BigEndian>(pBuffer, static_cast<uint16_t>(contentLength));
 	} else if (extendedLength == sizeof(uint64_t)) {
 		pBuffer->makeWriteableSpace(sizeof(uint64_t));
-		rapid::writeData<rapid::utils::BigEndian>(pBuffer, contentLength_);
+		rapid::writeData<rapid::utils::BigEndian>(pBuffer, contentLength);
 	}
 }
 
@@ -112,6 +112,18 @@ bool WebSocketRequest::isPong() const noexcept {
 	return opcode_ == WS_OP_PONG;
 }
 
+uint64_t WebSocketRequest::getConetentLength() const noexcept {
+	return content_.length();
+}
+
+std::string WebSocketRequest::content() const {
+	return content_;
+}
+
+void WebSocketRequest::setContent(std::string const &content) {
+	content_ = content;
+}
+
 void WebSocketRequest::doSerialize(rapid::IoBuffer* pBuffer) {
 }
 
@@ -142,7 +154,7 @@ WebSocketFrameReader::WebSocketFrameReader()
 	, totalReadBytes_(0) {
 }
 
-void WebSocketFrameReader::reset() {
+void WebSocketFrameReader::reset() noexcept {
 	lastFrame_ = true;
 	isMasked_ = true;
 	state_ = WS_PARSE_FIN;
@@ -154,21 +166,35 @@ void WebSocketFrameReader::reset() {
 	totalReadBytes_ = 0;
 }
 
-WebSocketOpcodes WebSocketFrameReader::opcode() const {
+WebSocketOpcodes WebSocketFrameReader::opcode() const noexcept {
 	return opcode_;
 }
 
-void WebSocketFrameReader::parseFinAndContentLength(rapid::IoBuffer* buffer) {
-	auto firstByte = buffer->peek()[0];
-	auto sencondByte = buffer->peek()[1];
+void WebSocketFrameReader::parseFinAndContentLength(rapid::IoBuffer* pBuffer) {
+	auto firstByte = pBuffer->peek()[0];
+	auto sencondByte = pBuffer->peek()[1];
 
 	lastFrame_ = (firstByte & WS_MASK_FIN) == WS_MASK_FIN;
 	unparsedContentLength_ = (sencondByte & WS_MASK_PAYLOAD_LENGTH);
 	isMasked_ = (sencondByte & 0x80) >> 7;
+	RAPID_ENSURE(isMasked_);
+
 	opcode_ = static_cast<WebSocketOpcodes>(firstByte & WS_MASK_OPCODE);
+
+	switch (opcode_) {
+	case WS_OP_CONTINUATION:
+	case WS_OP_TEXT:
+	case WS_OP_BINARY:
+	case WS_OP_CLOSED:
+	case WS_OP_PING:
+	case WS_OP_PONG:
+		break;
+	default:
+		RAPID_ENSURE("Error opcode" && 0);
+	}
 }
 
-bool WebSocketFrameReader::isReadyRead(rapid::IoBuffer* buffer) {
+bool WebSocketFrameReader::isReadyRead(rapid::IoBuffer* pBuffer) {
 	size_t bytesRead = 0;
 
 	switch (unparsedContentLength_) {
@@ -185,28 +211,28 @@ bool WebSocketFrameReader::isReadyRead(rapid::IoBuffer* buffer) {
 		break;
 	}
 
-	if (buffer->readable() >= bytesRead) {
+	if (pBuffer->readable() >= bytesRead) {
 		return true;
 	}
 
-	bytesReceiveLengthAndMask_ = bytesRead - buffer->readable();
+	bytesReceiveLengthAndMask_ = bytesRead - pBuffer->readable();
 	return false;
 }
 
-void WebSocketFrameReader::parseContentLength(rapid::IoBuffer* buffer) {
+void WebSocketFrameReader::parseContentLength(rapid::IoBuffer* pBuffer) {
 	indexOfFirstMask_ = 2;
 
 	switch (unparsedContentLength_) {
 		// ¥]§t16 bit Extend Payload Length
 	case WS_16BIT_EXT_PAYLOAD_LENGTH:
-		memcpy(&contentLength_, buffer->peek() + WS_MIN_SIZE, sizeof(uint16_t));
+		memcpy(&contentLength_, pBuffer->peek() + WS_MIN_SIZE, sizeof(uint16_t));
 		contentLength_ = static_cast<uint64_t>(ntohs(contentLength_));
 		indexOfFirstMask_ = 4;
 		bytesReceiveLengthAndMask_ = getMaskSize() + sizeof(uint16_t);
 		break;
 	case WS_64BIT_EXT_PAYLOAD_LENGTH:
 		// ¥]§t 64 bit Extend Payload Length
-		memcpy(&contentLength_, buffer->peek() + WS_MIN_SIZE, sizeof(uint64_t));
+		memcpy(&contentLength_, pBuffer->peek() + WS_MIN_SIZE, sizeof(uint64_t));
 		contentLength_ = htonll(contentLength_);
 		indexOfFirstMask_ = 10;
 		bytesReceiveLengthAndMask_ = getMaskSize() + sizeof(uint64_t);
@@ -217,30 +243,28 @@ void WebSocketFrameReader::parseContentLength(rapid::IoBuffer* buffer) {
 		break;
 	}
 
-	if (isMasked_) {
-		memcpy(mask_, buffer->peek() + indexOfFirstMask_, WS_MASK_SIZE);
-	}
+	RAPID_ENSURE(isMasked_);
+	memcpy(mask_, pBuffer->peek() + indexOfFirstMask_, WS_MASK_SIZE);
 }
 
 void WebSocketFrameReader::maskData(rapid::IoBuffer *buffer) {
-	if (!isMasked_) {
-		return;
-	}
-
+	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_ENSURE(isMasked_);
 	for (uint64_t i = 0; i < contentLength_; ++i) {
 		buffer->peek()[i] = buffer->peek()[i] ^ mask_[i % 4];
 	}
 }
 
-size_t WebSocketFrameReader::getMaskSize() const {
+size_t WebSocketFrameReader::getMaskSize() const noexcept {
 	return !isMasked_ ? 0 : 4;
 }
 
-uint64_t WebSocketFrameReader::getConetentLength() const {
+uint64_t WebSocketFrameReader::getConetentLength() const noexcept {
 	return contentLength_;
 }
 
 void WebSocketFrameReader::readFrame(rapid::IoBuffer* buffer, uint32_t &wantReadSize) {
+	RAPID_LOG_TRACE_STACK_TRACE();
 	switch (state_) {
 	case WS_PARSE_FIN:
 		if (buffer->isEmpty()) {
@@ -278,12 +302,28 @@ WebSocketCodec::WebSocketCodec(std::shared_ptr<MessageDispatcher<WebSocketReques
 }
 
 void WebSocketCodec::readLoop(rapid::ConnectionPtr &pConn, uint32_t &bytesToRead) {
+	RAPID_LOG_TRACE_STACK_TRACE();
+
 	auto pBuffer = pConn->getReceiveBuffer();
 	
+	do {
+		reader_.readFrame(pBuffer, bytesToRead);
+		if (!bytesToRead) {
+			pWebSocketRequest_->setOpcode(reader_.opcode());
+			pWebSocketRequest_->setContent(pBuffer->read(reader_.getConetentLength()));
+			reader_.reset();
+			dispatcher_->onMessage(WS_MESSAGE, pConn, pWebSocketRequest_);			
+		}
+	} while (!bytesToRead && !pBuffer->isEmpty());
+	
+	/*
 	reader_.readFrame(pBuffer, bytesToRead);
 	if (!bytesToRead) {
 		pWebSocketRequest_->setOpcode(reader_.opcode());
+		pWebSocketRequest_->setContent(pBuffer->read(reader_.getConetentLength()));
+		bool isEmpty = pBuffer->isEmpty();
 		dispatcher_->onMessage(WS_MESSAGE, pConn, pWebSocketRequest_);
 		reader_.reset();
 	}
+	*/
 }

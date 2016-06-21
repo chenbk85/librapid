@@ -12,6 +12,9 @@ namespace rapid {
 
 namespace details {
 
+Buffer::Buffer() {
+}
+
 Buffer::Buffer(Block const &block, MemAllocatorPtr allocator)
     : block_(block)
     , pAllocator_(allocator) {

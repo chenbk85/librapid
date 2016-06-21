@@ -26,18 +26,18 @@ std::ostream& operator << (std::ostream& ostr, IoBuffer const &buffer) {
 }
 
 IoBuffer::IoBuffer()
-	: writeIndex_(0)
+	: hasCompleted_(true)
+	, writeIndex_(0)
 	, readIndex_(0)
 	, prependable_(0) {
-	isCompleted_ = false;
 }
 
 IoBuffer::IoBuffer(uint32_t prependSize, details::BlockFactory &factory)
-	: writeIndex_(prependSize)
+	: hasCompleted_(true)
+	, writeIndex_(prependSize)
 	, readIndex_(prependSize)
 	, prependable_(prependSize)
 	, buffer_(factory.getBlock(), factory.getAllocator()) {
-	isCompleted_ = false;
 }
 
 IoBuffer::~IoBuffer() {
@@ -118,14 +118,13 @@ char const * IoBuffer::peek() const {
 }
 
 bool IoBuffer::send(std::shared_ptr<Connection> pConn) {
-	isCompleted_ = false;
-
 	if (isEmpty()) {
 		return true;
-	}
+	}	
 	uint32_t numByteSend = 0;
 	auto pReadData = peek();
 	auto readableBytes = readable();
+	hasCompleted_ = false;
 	if (pConn->sendAsync(pReadData, readableBytes, this, &numByteSend)) {
 		retrieve(numByteSend);
 		return true;
@@ -134,18 +133,15 @@ bool IoBuffer::send(std::shared_ptr<Connection> pConn) {
 }
 
 bool IoBuffer::readSome(std::shared_ptr<Connection> pConn) {
-	isCompleted_ = false;
-
 	return readSome(pConn, goodSize());
 }
 
 bool IoBuffer::readSome(std::shared_ptr<Connection> pConn, uint32_t requireSize) {
-	isCompleted_ = false;
-
     makeWriteableSpace(requireSize);    
 	resetOverlappedValue();    
 	uint32_t numBytesRecv = 0;	
 	RAPID_ENSURE(requireSize > 0);
+	hasCompleted_ = false;
     if (pConn->receiveAsync(writeData(), requireSize, this, &numBytesRecv)) {
         advanceWriteIndex(numBytesRecv);
         return true;
@@ -233,12 +229,12 @@ std::string IoBuffer::readAll() {
     return std::string(begin() + startIndex, readableBytes);
 }
 
-void IoBuffer::reset() throw() {
+void IoBuffer::reset() noexcept {
     writeIndex_ = prependable_;
     readIndex_ = prependable_;
 }
 
-void IoBuffer::resetOverlappedValue() throw() {
+void IoBuffer::resetOverlappedValue() noexcept {
     Internal = 0;
     InternalHigh = 0;
     Offset = 0;

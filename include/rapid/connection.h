@@ -155,7 +155,7 @@ private:
 	std::unique_ptr<IoBuffer> pPostBuffer_;
 	std::unique_ptr<IoBuffer> pDisconnectBuffer_;
 	AcceptBufferSize acceptSize_;
-	details::SocketAddressPair accpetedAddressInfo_;
+	details::SocketAddressPair accpetedAddress_;
 };
 
 __forceinline IoBuffer* Connection::getReceiveBuffer() const noexcept {

@@ -90,7 +90,7 @@ void SocketAcceptPooller::stopPoll() {
 }
 
 void SocketAcceptPooller::startPoll() {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
     RAPID_ENSURE(scaleSize_ <= maxPoolSize_);
     
@@ -199,7 +199,7 @@ void SocketAcceptPooller::pollLoop() {
 }
 
 void SocketAcceptPooller::pollNetworkEvent() {
-	RAPID_LOG_TRACE_INFO();
+	RAPID_LOG_TRACE_STACK_TRACE();
 
     HANDLE const waitEvents[2] = {
         shutdownEvent_,
