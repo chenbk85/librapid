@@ -26,13 +26,13 @@ public:
 
     bool enqueue(ULONG_PTR compKey, uint32_t numBytes, OVERLAPPED *overlapped) const noexcept;
 
-    bool dequeue(OVERLAPPED_ENTRY * __restrict entries, DWORD N, ULONG * __restrict removeCount, uint32_t timeout) noexcept;
+    bool dequeue(OVERLAPPED_ENTRY * __restrict entries, DWORD N, ULONG * __restrict removeCount, uint32_t timeout) const noexcept;
 
 private:
     HANDLE handle;
 };
 
-__forceinline bool IoEventQueue::dequeue(OVERLAPPED_ENTRY * __restrict entries, DWORD N, ULONG * __restrict removeCount, uint32_t timeout) noexcept {
+__forceinline bool IoEventQueue::dequeue(OVERLAPPED_ENTRY * __restrict entries, DWORD N, ULONG * __restrict removeCount, uint32_t timeout) const noexcept {
     return ::GetQueuedCompletionStatusEx(handle, entries, N, removeCount, timeout, FALSE) != FALSE;
 }
 

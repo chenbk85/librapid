@@ -5,12 +5,9 @@
 
 #pragma once
 
-#include <map>
 #include <fstream>
 
 #include <MultipartReader.h>
-
-#include <rapid/utils/stringutilis.h>
 
 #include "uri.h"
 #include "httpexception.h"

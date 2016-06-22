@@ -8,7 +8,6 @@
 #include <rapid/logging/logging.h>
 #include <rapid/logging/utilis.h>
 
-#include <rapid/platform/applicationsingleton.h>
 #include <rapid/utils/singleton.h>
 #include <rapid/utils/scopeguard.h>
 
@@ -38,23 +37,6 @@ BOOL WINAPI consoleHandler(DWORD consoleEvent) {
         break;
     }
     return FALSE;
-}
-
-void startLogging() {
-#ifdef _DEBUG
-	rapid::logging::startLogging(rapid::logging::Trace);
-#else
-	rapid::logging::startLogging(rapid::logging::Info);
-#endif
-
-	auto pFileLogAppender = std::make_shared<rapid::logging::FileLogAppender>();
-	pFileLogAppender->setLogDirectory(L"./log/");
-	rapid::logging::addLogAppender(pFileLogAppender);
-	
-	auto pConsoleOuputAppender = std::make_shared<rapid::logging::ConsoleOutputLogAppender>();
-	pConsoleOuputAppender->setConsoleFont(L"Lucida Console", 12);
-	pConsoleOuputAppender->setWindowSize(80, 50);
-	rapid::logging::addLogAppender(pConsoleOuputAppender);
 }
 
 void httpServerMain(int argc, char *argv[]) {
@@ -93,12 +75,6 @@ R"(	 _____ _____ _____ _____    _____
 
 int main(int argc, char *argv[]) {
 	std::cout << s_title << std::endl;
-
-    startLogging();
-
-	SCOPE_EXIT() {
-		rapid::logging::stopLogging();
-	};
 
 	// Setup console handler, we want to 'Ctrl + C' stopping server.
 	::SetConsoleCtrlHandler(consoleHandler, TRUE);

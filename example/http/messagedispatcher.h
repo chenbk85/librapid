@@ -7,9 +7,7 @@
 
 #include <concurrent_unordered_map.h>
 #include <memory>
-#include <string>
 
-#include <rapid/logging/logging.h>
 #include <rapid/connection.h>
 
 class MessageContext {

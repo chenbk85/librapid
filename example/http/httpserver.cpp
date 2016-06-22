@@ -71,7 +71,7 @@ void HttpServer::start() {
 		HttpServerConfigFacade::getInstance().getHttp2StreamPool().expand(DEBUG_POOL_SIZE);
 	}
 #else
-	static uint32_t const maxUserConnection = HttpServerConfigFacade::getInstance().getMaxUserConnection();
+	static auto const maxUserConnection = HttpServerConfigFacade::getInstance().getMaxUserConnection();
 	
 	HttpServerConfigFacade::getInstance().getHttpRequestPool().expand(maxUserConnection);
 	HttpServerConfigFacade::getInstance().getHttpResponsePool().expand(maxUserConnection);
@@ -145,7 +145,7 @@ HttpContextPtr HttpServer::removeHttpContext(size_t id) {
 }
 
 HttpContextPtr HttpServer::insertHttpContext(size_t id) {
-	HttpContextPtr pContext = createHttpContext();
+	auto pContext = createHttpContext();
 	std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 	auto ret = contextMap_.insert(std::make_pair(id, pContext));
 	RAPID_ENSURE(ret.second);

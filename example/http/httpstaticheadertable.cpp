@@ -1,4 +1,6 @@
 #include <fstream>
+#include <string>
+
 #include "httpstaticheadertable.h"
 
 HttpStaticHeaderTable::HttpStaticHeaderTable() {

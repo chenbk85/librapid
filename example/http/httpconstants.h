@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "httpheaders.h"
 
 // HTTP headers define

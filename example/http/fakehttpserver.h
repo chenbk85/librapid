@@ -12,8 +12,6 @@
 #include <rapid/connection.h>
 #include <rapid/tcpserver.h>
 
-#include "messagedispatcher.h"
-
 class FakeHttpServer {
 public:
 	static std::unique_ptr<FakeHttpServer> createHttpServer(std::string const &ipAddress, unsigned short port);

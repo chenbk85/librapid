@@ -5,10 +5,6 @@
 
 #pragma once
 
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include <rapid/objectpool.h>
 #include <rapid/utils/singleton.h>
 
@@ -16,11 +12,9 @@
 
 #include "filecachemanager.h"
 
-#include "predeclare.h"
 #include "httpscontext.h"
 #include "httpstaticheadertable.h"
 #include "httpmessage.h"
-#include "httpheaders.h"
 
 static uint32_t constexpr SIZE_4KB = 4 * 1024;
 static uint32_t constexpr SIZE_16KB = 16 * 1024;
@@ -40,10 +34,10 @@ class HttpServerConfigFacade : public rapid::utils::Singleton<HttpServerConfigFa
 public:
 	HttpServerConfigFacade();
 
+	~HttpServerConfigFacade();
+
 	HttpServerConfigFacade(const HttpServerConfigFacade &) = delete;
 	HttpServerConfigFacade& operator=(HttpServerConfigFacade const &) = delete;
-
-	void loadIniConfigFile(std::string const &filePath);
 
 	void loadXmlConfigFile(std::string const &filePath);
 

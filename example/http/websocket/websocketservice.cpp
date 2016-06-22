@@ -40,7 +40,7 @@ struct Message {
 		, content(message) {
 	}
 
-	bool operator==(Message const &message) {
+	bool operator==(Message const &message) const {
 		return messageId == message.messageId;
 	}
 
@@ -118,6 +118,9 @@ private:
 class BroadcastChannelManager {
 public:
 	BroadcastChannelManager() {
+	}
+
+	virtual ~BroadcastChannelManager() {
 	}
 
 	void addChannel(std::string const &channelName, int maxExpireSecs) {
@@ -371,7 +374,7 @@ private:
 	}
 
 	template <typename Lambda>
-	std::string makeMessage(Lambda &&addMemberHandler) {
+	static std::string makeMessage(Lambda &&addMemberHandler) {
 		rapidjson::Document doc(rapidjson::Type::kObjectType);
 		addMemberHandler(doc);
 		rapidjson::StringBuffer buffer;
@@ -380,7 +383,7 @@ private:
 		return std::string(buffer.GetString(), buffer.GetSize());
 	}
 
-	void addUserLoginMessage(std::string const &username) {
+	void addUserLoginMessage(std::string const &username) const {
 		MessagePusher::getInstance().push(makeMessage([username](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_USERNAME);
 			addMember(doc, "name", username);
@@ -388,7 +391,7 @@ private:
 		}));
 	}
 
-	void addChatRoomMessage(std::string const &username, std::string const &message) {
+	void addChatRoomMessage(std::string const &username, std::string const &message) const {
 		MessagePusher::getInstance().push(makeMessage([username, message](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_MESSAGE);
 			addMember(doc, "name", username);
@@ -397,7 +400,7 @@ private:
 		}));
 	}
 
-	void updateUserlistMessage(std::vector<std::string> const &userlist) {
+	void updateUserlistMessage(std::vector<std::string> const &userlist) const {
 		RAPID_TRACE_CALL();
 		MessagePusher::getInstance().push(makeMessage([userlist](rapidjson::Document &doc) {
 			rapidjson::Value array(rapidjson::kArrayType);
@@ -411,7 +414,7 @@ private:
 		}));
 	}
 
-	ChatMessage parse(std::string const &data) {
+	static ChatMessage parse(std::string const &data) {
 		RAPID_LOG_TRACE() << "Receive Message" << std::endl << data;
 		rapidjson::Document doc;
 		doc.Parse(data.c_str());
@@ -493,6 +496,7 @@ public:
 			// Performance counter 需要將'C', ')'換成'[', ']'
 			rapid::utils::replace(interface, "(", "[");
 			rapid::utils::replace(interface, ")", "]");
+			RAPID_LOG_TRACE() << "Interface: " << interface;
 			try {
 				counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Network Interface", L"Bytes Received/sec",
 					rapid::utils::fromBytes(interface)));

@@ -5,12 +5,6 @@
 
 #pragma once
 
-#include <mutex>
-
-#include <rapid/platform/spinlock.h>
-#include "openssl/sslcontext.h"
-
-#include "httpmessage.h"
 #include "httpcodec.h"
 
 #include "predeclare.h"

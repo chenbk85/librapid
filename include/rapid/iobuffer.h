@@ -5,16 +5,13 @@
 
 #pragma once
 
-#include <cstdint>
 #include <memory>
-#include <string>
 #include <functional>
 #include <atomic>
 
 #include <rapid/platform/platform.h>
 #include <rapid/details/ioflags.h>
 #include <rapid/details/buffer.h>
-#include <rapid/details/socket.h>
 
 namespace rapid {
 

@@ -102,7 +102,7 @@ class ThreadPool {
 public:
 	static uint32_t constexpr DEFAULT_NUM_WORKER = 4096;
 
-	ThreadPool(uint32_t numWorker = DEFAULT_NUM_WORKER);
+	explicit ThreadPool(uint32_t numWorker = DEFAULT_NUM_WORKER);
 
 	ThreadPool(ThreadPool const &) = delete;
 	ThreadPool& operator=(ThreadPool const &) = delete;
@@ -113,7 +113,7 @@ public:
 	void excute(Handler &&handler);
 
 	template <typename Handler, typename R = typename std::result_of<Handler()>::type>
-	typename std::future<R> async(Handler &&handler);
+	typename std::future<R> makeFuture(Handler &&handler);
 private:
 	details::Worker & getNextWorker();
 
@@ -153,7 +153,7 @@ inline void ThreadPool::excute(Handler && handler) {
 }
 
 template <typename Handler, typename R>
-typename std::future<R> ThreadPool::async(Handler &&handler) {
+typename std::future<R> ThreadPool::makeFuture(Handler &&handler) {
 	std::packaged_task<R()> task([handler = std::move(handler)]() {
 		return handler();
 	});

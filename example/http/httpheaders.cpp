@@ -39,7 +39,7 @@ void HttpHeaders::add(std::string const &name, char const *value, uint32_t value
 std::string const& HttpHeaders::get(HttpHeaderName const &header) const {
 	static std::string const EMPTY_STRING;
 
-	uint32_t numHeaderNames = static_cast<uint32_t>(headerNames_.size());
+	auto numHeaderNames = static_cast<uint32_t>(headerNames_.size());
 	for (uint32_t i = 0; i < numHeaderNames; ++i) {
 		if (header.hash() == headerNames_[i].first) {
 			return headerValues_[i];
@@ -58,7 +58,7 @@ void HttpHeaders::add(HttpHeaderName const& name, int64_t value) {
 }
 
 void HttpHeaders::remove(HttpHeaderName const& header) {
-	uint32_t numHeaderNames = static_cast<uint32_t>(headerNames_.size());
+	auto numHeaderNames = static_cast<uint32_t>(headerNames_.size());
 	for (uint32_t i = 0; i < numHeaderNames; ++i) {
 		if (header.hash() == headerNames_[i].first) {
 			headerNames_.erase(std::begin(headerNames_) + i);

@@ -262,5 +262,6 @@ void HttpContext::onDisconnect(rapid::ConnectionPtr &pConn) {
 
 	if (pWebSocketService_ != nullptr) {
 		pWebSocketService_->onWebSocketClose(pConn);
+		pWebSocketService_.reset();
 	}
 }

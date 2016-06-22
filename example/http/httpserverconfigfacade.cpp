@@ -3,30 +3,30 @@
 // More license information, please see LICENSE file in module root folder.
 //---------------------------------------------------------------------------------------------------------------------
 
-#include <fstream>
 #include <vector>
 #include <functional>
-#include <set>
-#include <algorithm>
-#include <algorithm>
+#include <unordered_map>
 
 #include <rapid/logging/logging.h>
+#include <rapid/logging/utilis.h>
+
+#include <rapid/utils/stringutilis.h>
 
 #include <rapidxml/rapidxml.hpp>
 #include <rapidxml/rapidxml_utils.hpp>
 
-#include <rapid/platform/inifilereader.h>
-
 #include "httpserverconfigfacade.h"
 
-HttpServerConfigFacade::HttpServerConfigFacade()
-	: listenPort_(80)
-	, enableHttp2Proto_(false)
-	, enableSSLProto_(false)
-	, maxUserConnection_(0)
-	, numaNode_(0)
-	, bufferSize_(0)
-	, initialUserConnection_(0) {
+static rapid::logging::Level getLogLevel(std::string const &str) {
+	static std::unordered_map<std::string, rapid::logging::Level> const levelTables{
+		{ "Info",  rapid::logging::Info },
+		{ "Error",  rapid::logging::Error },
+		{ "Fatal",  rapid::logging::Fatal },
+		{ "Warn",  rapid::logging::Warn },
+		{ "Trace",  rapid::logging::Trace },
+	};
+	auto itr = levelTables.find(str);
+	return (*itr).second;
 }
 
 static void readXmlSettings(rapidxml::xml_node<char> *node, std::map<std::string, std::string>& settings) {
@@ -53,36 +53,34 @@ static void createAppenderFromSetting(std::map<std::string, rapidxml::xml_node<c
 	if (settings.find("FileAppender") != settings.end()) {
 		auto fileAppender = settings.find("FileAppender");
 		readXmlSettings((*fileAppender).second, sets);
-	} else if (settings.find("ConsoleAppender") != settings.end()) {
+		auto pFileLogAppender = std::make_shared<rapid::logging::FileLogAppender>();
+		pFileLogAppender->setLogDirectory(rapid::utils::fromBytes(sets["LogDirectory"]));
+		rapid::logging::addLogAppender(pFileLogAppender);
+	} 
+	if (settings.find("ConsoleAppender") != settings.end()) {
 		auto consoleAppender = settings.find("ConsoleAppender");
 		readXmlSettings((*consoleAppender).second, sets);
+		auto pConsoleOuputAppender = std::make_shared<rapid::logging::ConsoleOutputLogAppender>();
+		pConsoleOuputAppender->setConsoleFont(rapid::utils::fromBytes(sets["Font"]),
+			std::strtoul(sets["FontSize"].c_str(), nullptr, 10));
+		pConsoleOuputAppender->setWindowSize(80, 50);
+		rapid::logging::addLogAppender(pConsoleOuputAppender);
 	}
 }
 
-void HttpServerConfigFacade::loadIniConfigFile(std::string const &filePath) {
-	rapid::IniFileReader reader(filePath);
+HttpServerConfigFacade::HttpServerConfigFacade()
+	: enableHttp2Proto_(false)
+	, enableSSLProto_(false)
+	, listenPort_(80)
+	, upgradeableHttp2_(false)
+	, numaNode_(0)
+	, bufferSize_(0)
+	, maxUserConnection_(0)
+	, initialUserConnection_(0) {
+}
 
-	// Server
-	serverName_ = reader.getString("Server", "ServerName");
-	listenPort_ = reader.getInt("Server", "Port", 80);
-	bufferSize_ = reader.getInt("Server", "BufferSize", SIZE_16KB);
-	initialUserConnection_ = reader.getInt("Server", "InitialUserConnection", 1000);
-	maxUserConnection_ = reader.getInt("Server", "MaxUserConnection", 25000);
-
-	// HTTP
-	host_ = reader.getString("HTTP", "Host");
-	enableSSLProto_ = reader.getBoolean("HTTP", "EnableSSL");
-	enableHttp2Proto_ = reader.getBoolean("HTTP", "EnableHttp2");
-	tempFilePath_ = reader.getString("HTTP", "TempFilePath");
-	rootPath_ = reader.getString("HTTP", "RootPath");
-	indexFileName_ = reader.getString("HTTP", "IndexFileName");
-
-	// SSL
-	if (enableSSLProto_) {
-		// SSL Certificate File Path
-		certificateFilePath_ = reader.getString("SSL", "CertificateFilePath");
-		privateKeyFilePath_ = reader.getString("SSL", "PrivateKeyFilePath");
-	}
+HttpServerConfigFacade::~HttpServerConfigFacade() {
+	rapid::logging::stopLogging();
 }
 
 void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
@@ -120,16 +118,20 @@ void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
 
 	std::map<std::string, std::string> sslSettings;
 	auto ssl = (*httpServer).first_node("SSL");
-	readXmlSettings(ssl, sslSettings);
-	// Setting Http config
-	{
-		certificateFilePath_ = sslSettings["CertificateFilePath"];
-		privateKeyFilePath_ = sslSettings["PrivateKeyFilePath"];
+	if (!ssl) {
+		readXmlSettings(ssl, sslSettings);
+		// Setting Http config
+		{
+			certificateFilePath_ = sslSettings["CertificateFilePath"];
+			privateKeyFilePath_ = sslSettings["PrivateKeyFilePath"];
+		}
 	}
 
 	std::map<std::string, std::string> loggerSettings;
 	auto logger = (*httpServer).first_node("Logger");
 	readXmlSettings(logger, loggerSettings);
+
+	rapid::logging::startLogging(getLogLevel(loggerSettings["Level"]));
 
 	std::vector<std::shared_ptr<rapid::logging::LogAppender>> appenders;
 	std::map<std::string, rapidxml::xml_node<char> *> settings;
