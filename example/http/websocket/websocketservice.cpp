@@ -2,106 +2,26 @@
 #include <vector>
 #include <chrono>
 
+#include <date.h>
+
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
 #include <rapid/iobuffer.h>
 #include <rapid/platform/performancecounter.h>
+#include <rapid/platform/tcpipparameters.h>
 #include <rapid/platform/utils.h>
 #include <rapid/logging/logging.h>
 #include <rapid/utils/mpmc_bounded_queue.h>
 #include <rapid/utils/threadpool.h>
+#include <rapid/utils/stopwatch.h>
 #include <rapid/platform/spinlock.h>
 #include <rapid/details/timingwheel.h>
 #include <rapid/utils/stopwatch.h>
 #include <rapid/utils/stringutilis.h>
 
 #include "websocketservice.h"
-
-class WebSocketPerfmonService : public WebSocketService {
-public:
-	WebSocketPerfmonService() {
-		pTimer_ = rapid::details::Timer::createTimer();
-		auto appName = rapid::platform::getApplicationFileName();
-		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"% Processor Time", appName));
-		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Pool Nonpaged Bytes", appName));
-		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Page Faults/sec", appName));
-		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Working Set", appName));
-	}
-
-	virtual ~WebSocketPerfmonService() {
-
-	}
-
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
-		// Set dummy send handler, We don't care about send success or not!
-		pConn->setSendEventHandler([](rapid::ConnectionPtr) {});	
-
-		pTimer_->start([pConn, this]() {
-			auto pBuffer = pConn->getSendBuffer();
-			if (!pBuffer->hasCompleted()) {
-				return;
-			}
-
-			try {
-				writeToJSON(pBuffer);
-				pConn->sendAsync();
-			} catch (rapid::Exception const &e) {
-				RAPID_LOG_ERROR() << e.what();
-				pConn->sendAndDisconnec();
-			}
-		}, 1000);
-	}
-
-	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
-		return false;
-	}
-
-	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
-	}
-
-private:
-	void writeToJSON(rapid::IoBuffer *pBuffer) {
-		WebSocketResponse response;
-
-		rapidjson::Document doc(rapidjson::Type::kObjectType);
-		rapidjson::Value host(rapidjson::Type::kObjectType);
-
-		host.SetString("Server");
-		doc.AddMember("host", host, doc.GetAllocator());
-
-		rapidjson::Value time(rapidjson::Type::kObjectType);
-		auto currentTime = std::to_string(std::time(nullptr));
-		time.SetString(currentTime.c_str(), currentTime.length());
-		doc.AddMember("time", time, doc.GetAllocator());
-
-		rapidjson::Value counters(rapidjson::Type::kObjectType);
-
-		for (auto const &counter : counters_) {
-			rapidjson::Value counterValue(rapidjson::Type::kObjectType);
-			auto current = std::to_string(counter->currentAsLong());
-			counterValue.SetString(current.c_str(), current.length(), doc.GetAllocator());
-
-			auto temp = rapid::utils::formUtf16(counter->path());
-			rapidjson::Value counterPathName(rapidjson::Type::kStringType);
-			counterPathName.SetString(temp.c_str(), temp.length(), doc.GetAllocator());
-			counters.AddMember(counterPathName, counterValue, doc.GetAllocator());
-		}
-
-		doc.AddMember("counters", counters, doc.GetAllocator());
-		rapidjson::StringBuffer buffer;
-		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-		doc.Accept(writer);
-
-		response.setContentLength(buffer.GetSize());
-		response.serialize(pBuffer);
-		pBuffer->append(buffer.GetString(), buffer.GetSize());
-	}
-
-	rapid::details::TimerPtr pTimer_;
-	std::vector<std::unique_ptr<rapid::platform::PerformanceCounter>> counters_;
-};
 
 static std::string const MSG_TYPE_ID = "id";
 static std::string const MSG_TYPE_MESSAGE = "message";
@@ -112,13 +32,11 @@ struct Message {
 	static const Message EMPTY_MESSAGE;
 
 	Message()
-		: messageId(-1)
-		, liveTime(-1) {
+		: messageId(-1) {
 	}
 
 	explicit Message(int id, std::string const &message)
 		: messageId(id)
-		, liveTime(0)
 		, content(message) {
 	}
 
@@ -127,7 +45,7 @@ struct Message {
 	}
 
 	int messageId;
-	int liveTime;
+	rapid::utils::SystemStopwatch liveTime;
 	std::string content;
 };
 
@@ -145,28 +63,18 @@ static uint32_t makeUniqueMessageId() {
 
 class BroadcastChannel {
 public:
-	explicit BroadcastChannel(std::string const &name)
+	BroadcastChannel(std::string const &name, int maxExpireSecs)
 		: name_(name)
-		, maxExpireSecs_(INT_MAX) {
+		, maxExpireSecs_(maxExpireSecs) {
 	}
 
 	std::string name() const {
 		return name_;
 	}
 
-	void subscribe(std::string const &client) {
-		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		subscribers_[client] = 0;
-	}
-
-	void unSubscribe(std::string const &client) {
-		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		subscribers_.erase(client);
-	}
-
 	void dequeue(std::string const &key) {
 		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		auto ret = messages_.erase(key);	
+		auto ret = messages_.erase(key);
 	}
 
 	void enqueue(std::string const &key, std::string const &message) {
@@ -192,7 +100,7 @@ public:
 		for (auto const & message : messages_) {
 			if (message.second.messageId >= messageId) {
 				if (maxExpireSecs_ == 0
-					|| liveTime <= maxExpireSecs_) {
+					|| message.second.liveTime.elapsedCount<std::chrono::seconds>() <= maxExpireSecs_) {
 					return message.second;
 				}
 			}
@@ -204,48 +112,47 @@ private:
 	mutable rapid::platform::Spinlock lock_;
 	int maxExpireSecs_;
 	std::string name_;
-	std::map<std::string, int> subscribers_;
 	std::map<std::string, Message> messages_;
 };
 
 class BroadcastChannelManager {
 public:
 	BroadcastChannelManager() {
-
 	}
 
-	void addChannle(std::string const &channelName) {
-		channels_[channelName] = std::make_shared<BroadcastChannel>(channelName);
+	void addChannel(std::string const &channelName, int maxExpireSecs) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
+		channels_[channelName] = std::make_shared<BroadcastChannel>(channelName, maxExpireSecs);
 	}
 
 	void removeChannel(std::string const &channelName) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 		channels_.erase(channelName);
 	}
 
 	std::shared_ptr<BroadcastChannel> getChannel(std::string const &channelName) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 		return channels_[channelName];
 	}
 
-	void pushMessage(std::string const &channelName, 
-		std::string const &key,
-		std::string const &message) {
+	void pushMessage(std::string const &channelName, std::string const &key, std::string const &message) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 		onStartupChannel(channelName);
 		channels_[channelName]->enqueue(key, message);
 		onActiveSubscribers(channelName);
 	}
 
-	void pushMessage(std::string const &channelName,
-		int key,
-		std::string const &message) {
+	void pushMessage(std::string const &channelName, int key, std::string const &message) {
 		pushMessage(channelName, std::to_string(key), message);
 	}
 
 	void removeMessage(std::string const &channelName, int key) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 		channels_[channelName]->dequeue(std::to_string(key));
 	}
 
-	void removeMessage(std::string const &channelName,
-		std::string const &key) {
+	void removeMessage(std::string const &channelName, std::string const &key) {
+		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 		channels_[channelName]->dequeue(key);
 	}
 
@@ -257,6 +164,7 @@ protected:
 	}
 
 private:
+	mutable rapid::platform::Spinlock lock_;
 	std::unordered_map<std::string, std::shared_ptr<BroadcastChannel>> channels_;
 };
 
@@ -309,63 +217,79 @@ public:
 			pushThread_.join();
 	}
 
-	void subscribe(std::string const &name, rapid::ConnectionPtr &pConn) {
-		RAPID_LOG_TRACE_STACK_TRACE();
+	void subscribe(std::string const &name, rapid::ConnectionPtr &pConn, int maxExpireSecs = INT_MAX) {
+		RAPID_TRACE_CALL();
 		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		userlist_[name] = pConn;
-		mananger_.addChannle(name);
+		connlist_[name] = pConn;
+		mananger_.addChannel(name, maxExpireSecs);
 	}
 
 	void unSubscribe(std::string const &name) {
-		RAPID_LOG_TRACE_STACK_TRACE();
+		RAPID_TRACE_CALL();
 		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		userlist_.erase(name);
+		connlist_.erase(name);
 		mananger_.removeChannel(name);
 	}
 
-	void pushAll(std::string const &message) {
-		RAPID_LOG_TRACE_STACK_TRACE();
+	void push(std::string const &message) {
+		RAPID_TRACE_CALL();
 		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		auto userIdList = getUserIdList();
-		for (auto const &uid : userIdList) {
-			mananger_.pushMessage(std::to_string(uid), "", message);
+		auto subscribeList = getSubscribeList();
+		for (auto const &subscribe : subscribeList) {
+			mananger_.pushMessage(subscribe, "", message);
 		}
 	}
 
-	void push(std::string const &name, std::string const &message) {
-		RAPID_LOG_TRACE_STACK_TRACE();
+	void pushWithName(std::string const &name, std::string const &message) {
+		RAPID_TRACE_CALL();
 		mananger_.pushMessage(name, "", message);
 	}
 
 private:
+	std::vector<std::string> getSubscribeList() {
+		RAPID_TRACE_CALL();
+
+		std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
+
+		std::vector<std::string> userlist;
+		for (auto &user : connlist_) {
+			userlist.push_back(user.first);
+		}
+		return userlist;
+	}
+
 	void pushMessageLoop() {
 		rapid::utils::ThreadPool pool;
+
 		while (!stopped_) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-			for (auto &user : userlist_) {
-				pool.excute([user, this]() {
+			if (auto lock = rapid::platform::tryToLock(lock_)) {
+				for (auto &user : connlist_) {
 					auto message = mananger_.getChannel(user.first)->getNextMessage();
-					if (message == Message::EMPTY_MESSAGE)
-						return;
+					if (message == Message::EMPTY_MESSAGE) {
+						continue;
+					}
 					auto pBuffer = user.second->getSendBuffer();
-					if (!pBuffer->hasCompleted())
-						return;
-					RAPID_LOG_TRACE() << "Send Message " << message.messageId << std::endl << message.content;
-					WebSocketResponse resp;
-					resp.setContentLength(message.content.length());
-					resp.serialize(pBuffer);
-					pBuffer->append(message.content);
-					user.second->sendAsync();
-					mananger_.removeMessage(user.first, message.messageId);
-				});				
+					if (!pBuffer->hasCompleted()) {
+						continue;
+					}
+					pool.excute([user, message, pBuffer, this]() {
+						RAPID_LOG_TRACE() << "Send Message " << message.messageId << std::endl << message.content;
+						WebSocketResponse resp;
+						resp.setContentLength(message.content.length());
+						resp.serialize(pBuffer);
+						pBuffer->append(message.content);
+						user.second->sendAsync();
+						mananger_.removeMessage(user.first, message.messageId);
+					});
+				}
 			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 	}
 
 	mutable rapid::platform::Spinlock lock_;
-	bool stopped_;
-	std::unordered_map<std::string, rapid::ConnectionPtr> userlist_;
+	volatile bool stopped_;
+	std::unordered_map<std::string, rapid::ConnectionPtr> connlist_;
 	BroadcastChannelManager mananger_;	
 	std::thread pushThread_;
 };
@@ -388,18 +312,20 @@ public:
 
 	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
 		MessagePusher::getInstance().subscribe(std::to_string(uid_), pConn);
+
 		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
 			auto pBuffer = conn->getReceiveBuffer();
 			if (pBuffer->hasCompleted())
 				pContext->readLoop(conn);
 		});
+
 		addUidMessage(uid_);
 	}
 
 	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
 		if (webSocketRequest->isClosed()) {
 			onWebSocketClose(pConn);
-			return false; // 不繼續讀取!
+			return false;
 		}
 		auto message = parse(webSocketRequest->content());
 		if (message.types == MSG_TYPE_USERNAME) {			
@@ -437,7 +363,7 @@ private:
 	}
 
 	void addUidMessage(int uid) {
-		MessagePusher::getInstance().push(std::to_string(uid_), makeMessage([this, uid](rapidjson::Document &doc) {
+		MessagePusher::getInstance().pushWithName(std::to_string(uid_), makeMessage([this, uid](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_ID);
 			addMember(doc, "id", std::to_string(uid));
 			addMember(doc, "date", time(nullptr));
@@ -455,7 +381,7 @@ private:
 	}
 
 	void addUserLoginMessage(std::string const &username) {
-		MessagePusher::getInstance().pushAll(makeMessage([username](rapidjson::Document &doc) {
+		MessagePusher::getInstance().push(makeMessage([username](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_USERNAME);
 			addMember(doc, "name", username);
 			addMember(doc, "date", time(nullptr));
@@ -463,7 +389,7 @@ private:
 	}
 
 	void addChatRoomMessage(std::string const &username, std::string const &message) {
-		MessagePusher::getInstance().pushAll(makeMessage([username, message](rapidjson::Document &doc) {
+		MessagePusher::getInstance().push(makeMessage([username, message](rapidjson::Document &doc) {
 			addMember(doc, "type", MSG_TYPE_MESSAGE);
 			addMember(doc, "name", username);
 			addMember(doc, "date", time(nullptr));
@@ -472,8 +398,8 @@ private:
 	}
 
 	void updateUserlistMessage(std::vector<std::string> const &userlist) {
-		RAPID_LOG_TRACE_STACK_TRACE();
-		MessagePusher::getInstance().pushAll(makeMessage([userlist](rapidjson::Document &doc) {
+		RAPID_TRACE_CALL();
+		MessagePusher::getInstance().push(makeMessage([userlist](rapidjson::Document &doc) {
 			rapidjson::Value array(rapidjson::kArrayType);
 			addMember(doc, "type", MSG_TYPE_USERLIST);
 			for (auto const &user : userlist) {
@@ -541,10 +467,10 @@ public:
 		if (!webSocketRequest->isClosed()) {
 			auto pReceiveBuffer = pConn->getReceiveBuffer();
 			auto content = pReceiveBuffer->read(pReceiveBuffer->readable());
-			WebSocketResponse response;
+			WebSocketResponse resp;
 			auto pSendBuffer = pConn->getSendBuffer();
-			response.setContentLength(content.length());
-			response.serialize(pSendBuffer);
+			resp.setContentLength(content.length());
+			resp.serialize(pSendBuffer);
 			pSendBuffer->append(content);
 			isSendCompleted = pConn->sendAsync();
 		} else {
@@ -559,45 +485,102 @@ public:
 	}
 };
 
-class WebSocketBenchmarkService : public WebSocketService {
+class WebSocketPerfmonService : public WebSocketService {
 public:
-	WebSocketBenchmarkService() {
-
+	WebSocketPerfmonService() {
+		auto interfaceList = rapid::platform::getInterfaceNameList();
+		for (auto & interface : interfaceList) {
+			// Performance counter 需要將'C', ')'換成'[', ']'
+			rapid::utils::replace(interface, "(", "[");
+			rapid::utils::replace(interface, ")", "]");
+			try {
+				counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Network Interface", L"Bytes Received/sec",
+					rapid::utils::fromBytes(interface)));
+				counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Network Interface", L"Bytes Sent/sec",
+					rapid::utils::fromBytes(interface)));
+			} catch (rapid::Exception const &e) {
+				RAPID_LOG_IF(rapid::logging::Warn, e.error() != PDH_CSTATUS_NO_INSTANCE) << e.what();
+			}			
+		}
+		pTimer_ = rapid::details::Timer::createTimer();
+		auto appName = rapid::platform::getApplicationFileName();
+		uid_ = makeUniqueUid();
+		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"% Processor Time", appName));
+		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Pool Nonpaged Bytes", appName));
+		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Page Faults/sec", appName));
+		counters_.push_back(std::make_unique<rapid::platform::PerformanceCounter>(L"Process", L"Working Set", appName));
 	}
 
-	virtual ~WebSocketBenchmarkService() {
-
+	virtual ~WebSocketPerfmonService() {
 	}
 
 	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
-		pContext->readLoop(pConn);
+		pusher_.subscribe(std::to_string(uid_), pConn);
+		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
+			auto pBuffer = conn->getReceiveBuffer();
+			if (pBuffer->hasCompleted())
+				pContext->readLoop(conn);
+		});
+		pTimer_ = rapid::details::Timer::createTimer();
+		pTimer_->start([this]() {
+			pushMessage();
+		}, 1000);
 	}
 
 	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
-		bool isSendCompleted = true;
-		char buffer[1024] = { '1', '0', '2', '4', 0 };
-
-		if (!webSocketRequest->isClosed()) {
-			auto pReceiveBuffer = pConn->getReceiveBuffer();
-			auto content = pReceiveBuffer->read(pReceiveBuffer->readable());
-			WebSocketResponse response;
-			auto pSendBuffer = pConn->getSendBuffer();
-			response.setContentLength(sizeof(buffer));
-			response.serialize(pSendBuffer);
-			pSendBuffer->append(buffer, sizeof(buffer));
-			isSendCompleted = pConn->sendAsync();
-		} else {
+		if (webSocketRequest->isClosed()) {
 			onWebSocketClose(pConn);
+			return false;
 		}
-
-		return isSendCompleted;
+		pushMessage();
+		return true;
 	}
 
 	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
-
+		pusher_.unSubscribe(std::to_string(uid_));
 	}
-};
 
+private:
+	void pushMessage() {
+		WebSocketResponse resp;
+
+		rapidjson::Document doc(rapidjson::Type::kObjectType);
+		rapidjson::Value host(rapidjson::Type::kObjectType);
+
+		host.SetString("Server");
+		doc.AddMember("host", host, doc.GetAllocator());
+
+		rapidjson::Value time(rapidjson::Type::kObjectType);
+		auto currentTime = std::to_string(std::time(nullptr));
+		time.SetString(currentTime.c_str(), currentTime.length());
+		doc.AddMember("time", time, doc.GetAllocator());
+
+		rapidjson::Value counters(rapidjson::Type::kObjectType);
+
+		for (auto const &counter : counters_) {
+			rapidjson::Value counterValue(rapidjson::Type::kObjectType);
+			auto current = std::to_string(counter->currentAsLong());
+			counterValue.SetString(current.c_str(), current.length(), doc.GetAllocator());
+
+			auto temp = rapid::utils::formUtf16(counter->path());
+			rapidjson::Value counterPathName(rapidjson::Type::kStringType);
+			counterPathName.SetString(temp.c_str(), temp.length(), doc.GetAllocator());
+			counters.AddMember(counterPathName, counterValue, doc.GetAllocator());
+		}
+
+		doc.AddMember("counters", counters, doc.GetAllocator());
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		doc.Accept(writer);
+
+		pusher_.push(std::string(buffer.GetString(), buffer.GetSize()));
+	}
+
+	uint32_t uid_;
+	rapid::details::TimerPtr pTimer_;
+	std::vector<std::unique_ptr<rapid::platform::PerformanceCounter>> counters_;
+	MessagePusher pusher_;
+};
 
 WebSocketService::WebSocketService() {
 }
@@ -608,6 +591,5 @@ std::shared_ptr<WebSocketService> WebSocketService::createService(std::string co
 	} else if (protocol == "perfmon") {
 		return std::make_shared<WebSocketPerfmonService>();
 	}
-	//return std::make_shared<WebSocketEchoService>();
-	return std::make_shared<WebSocketBenchmarkService>();
+	return std::make_shared<WebSocketEchoService>();
 }

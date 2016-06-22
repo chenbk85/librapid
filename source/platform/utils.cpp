@@ -14,6 +14,9 @@
 #include <Objbase.h>
 #include <Winsock2.h>
 #include <Psapi.h>
+#include <iphlpapi.h>
+
+#pragma comment(lib, "iphlpapi.lib")
 
 #include <rapid/exception.h>
 
@@ -343,6 +346,42 @@ void prefetchVirtualMemory(char const * virtualAddress, size_t size) {
 	if (!::PrefetchVirtualMemory(::GetCurrentProcess(), 1, &entry, 0)) {
 		throw rapid::Exception();
 	}
+}
+
+std::vector<std::string> getInterfaceNameList() {
+	std::vector<std::string> interfaceList;
+	std::vector<char> buffer;
+	/*
+	PIP_INTERFACE_INFO pInterfaceInfo = nullptr;
+	DWORD interfaceInfoSize = 0;
+	auto ret = ::GetInterfaceInfo(nullptr, &interfaceInfoSize);
+	if (ret == ERROR_INSUFFICIENT_BUFFER) {
+	buffer.resize(interfaceInfoSize);
+	pInterfaceInfo = reinterpret_cast<PIP_INTERFACE_INFO>(buffer.data());
+	}
+	ret = ::GetInterfaceInfo(pInterfaceInfo, &interfaceInfoSize);
+	if (ret == NO_ERROR) {
+	for (DWORD i = 0; i < pInterfaceInfo->NumAdapters; ++i) {
+	interfaceList.emplace_back(pInterfaceInfo->Adapter[i].Name);
+	}
+	}
+	*/
+
+	PIP_ADAPTER_INFO pInterfaceInfo = nullptr;
+	DWORD interfaceInfoSize = 0;
+	auto ret = ::GetAdaptersInfo(nullptr, &interfaceInfoSize);
+	if (ret == ERROR_BUFFER_OVERFLOW) {
+		buffer.resize(interfaceInfoSize);
+		pInterfaceInfo = reinterpret_cast<PIP_ADAPTER_INFO>(buffer.data());
+	}
+	ret = ::GetAdaptersInfo(pInterfaceInfo, &interfaceInfoSize);
+	if (ret == NO_ERROR) {
+		while (pInterfaceInfo) {
+			interfaceList.emplace_back(pInterfaceInfo->Description);
+			pInterfaceInfo = pInterfaceInfo->Next;
+		}
+	}
+	return interfaceList;
 }
 
 }

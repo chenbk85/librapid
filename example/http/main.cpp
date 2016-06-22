@@ -42,7 +42,7 @@ BOOL WINAPI consoleHandler(DWORD consoleEvent) {
 
 void startLogging() {
 #ifdef _DEBUG
-	rapid::logging::startLogging(rapid::logging::Info);
+	rapid::logging::startLogging(rapid::logging::Trace);
 #else
 	rapid::logging::startLogging(rapid::logging::Info);
 #endif

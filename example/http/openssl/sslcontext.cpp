@@ -361,7 +361,7 @@ void OpenSslEngine::reset() {
 }
 
 bool OpenSslEngine::decrypt(rapid::IoBuffer *pBuffer) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	RAPID_ENSURE(!pBuffer->isEmpty());
 
@@ -393,7 +393,7 @@ bool OpenSslEngine::decrypt(rapid::IoBuffer *pBuffer) {
 }
 
 bool OpenSslEngine::handshake(rapid::IoBuffer *pSource, rapid::IoBuffer *pDest) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	if (isNegotiationFinished_) {
 		return true;
@@ -433,7 +433,7 @@ bool OpenSslEngine::handshake(rapid::IoBuffer *pSource, rapid::IoBuffer *pDest) 
 }
 
 void OpenSslEngine::encrypt(rapid::IoBuffer *pBuffer) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	while (!pBuffer->isEmpty()) {
 		auto bytesWrite = ::SSL_write(pSSL_, pBuffer->peek(), pBuffer->readable());

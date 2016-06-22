@@ -14,6 +14,8 @@
 #include <future>
 #include <type_traits>
 
+#include <rapid/details/contracts.h>
+
 #include <rapid/utils/mpmc_bounded_queue.h>
 
 // https://github.com/inkooboo/thread-pool-cpp
@@ -38,10 +40,10 @@ public:
 	Worker(Worker const &) = delete;
 	Worker& operator=(Worker const &) = delete;
 
-	void start(uint32_t id, Worker *pOtherWorker);
+	void start(uint32_t id, std::weak_ptr<Worker> pPair);
 
 	template <typename Handler>
-	bool post(Handler &&handler) noexcept;
+	bool tryPost(Handler &&handler) noexcept;
 
 	bool trySteal(std::function<void(void)> &handler) noexcept;
 private:
@@ -61,12 +63,19 @@ Worker::~Worker() {
 		thread_.join();
 }
 
-inline void Worker::start(uint32_t id, Worker *pOtherWorker) {
-	thread_ = std::thread([this, pOtherWorker, id]() {
+inline void Worker::start(uint32_t id, std::weak_ptr<Worker> pPair) {
+	thread_ = std::thread([this, pPair, id]() {
 		*getCurrentThreadId() = id;
+
 		std::function<void(void)> handler;
+
 		while (!stopped_) {
-			if (queue_.dequeue(handler) || pOtherWorker->trySteal(handler)) {
+			auto pOther = pPair.lock();
+
+			if (!pOther)
+				continue;
+			
+			if (queue_.dequeue(handler) || pOther->trySteal(handler)) {
 				try {
 					handler(); 
 				} catch (...) {
@@ -83,7 +92,7 @@ inline bool Worker::trySteal(std::function<void(void)>& handler) noexcept {
 }
 
 template<typename Handler>
-inline bool Worker::post(Handler && handler) noexcept {
+inline bool Worker::tryPost(Handler &&handler) noexcept {
 	return queue_.enqueue(std::forward<Handler>(handler));
 }
 
@@ -109,7 +118,7 @@ private:
 	details::Worker & getNextWorker();
 
 	std::atomic<uint32_t> index_;
-	std::vector<std::unique_ptr<details::Worker>> workers_;
+	std::vector<std::shared_ptr<details::Worker>> workers_;
 };
 
 inline ThreadPool::ThreadPool(uint32_t numWorker) {
@@ -120,7 +129,8 @@ inline ThreadPool::ThreadPool(uint32_t numWorker) {
 	}
 
 	for (size_t i = 0; i < workers_.size(); ++i) {
-		workers_[i]->start(i, workers_[(i + 1) % workers_.size()].get());
+		workers_[i]->start(i, 
+			std::weak_ptr<details::Worker>(workers_[(i + 1) % workers_.size()]));
 	}
 }
 
@@ -137,7 +147,7 @@ inline details::Worker & ThreadPool::getNextWorker() {
 
 template<typename Handler>
 inline void ThreadPool::excute(Handler && handler) {
-	if (!getNextWorker().post(std::forward<Handler>(handler))) {
+	if (!getNextWorker().tryPost(std::forward<Handler>(handler))) {
 		throw std::overflow_error("worker queue is full");
 	}
 }
@@ -150,7 +160,7 @@ typename std::future<R> ThreadPool::async(Handler &&handler) {
 
 	std::future<R> result = task.get_future();
 
-	if (!getNextWorker().post(task)) {
+	if (!getNextWorker().tryPost(task)) {
 		throw std::overflow_error("worker queue is full");
 	}
 

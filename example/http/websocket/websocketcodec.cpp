@@ -248,7 +248,7 @@ void WebSocketFrameReader::parseContentLength(rapid::IoBuffer* pBuffer) {
 }
 
 void WebSocketFrameReader::maskData(rapid::IoBuffer *buffer) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	RAPID_ENSURE(isMasked_);
 	for (uint64_t i = 0; i < contentLength_; ++i) {
 		buffer->peek()[i] = buffer->peek()[i] ^ mask_[i % 4];
@@ -264,7 +264,7 @@ uint64_t WebSocketFrameReader::getConetentLength() const noexcept {
 }
 
 void WebSocketFrameReader::readFrame(rapid::IoBuffer* buffer, uint32_t &wantReadSize) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	switch (state_) {
 	case WS_PARSE_FIN:
 		if (buffer->isEmpty()) {
@@ -302,7 +302,7 @@ WebSocketCodec::WebSocketCodec(std::shared_ptr<MessageDispatcher<WebSocketReques
 }
 
 void WebSocketCodec::readLoop(rapid::ConnectionPtr &pConn, uint32_t &bytesToRead) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	auto pBuffer = pConn->getReceiveBuffer();
 	

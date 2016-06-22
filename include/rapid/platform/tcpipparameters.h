@@ -19,6 +19,7 @@ public:
 	~TcpIpParameters() noexcept;
 
 	uint32_t getTcpTimedWaitDelay() const;
+
 	uint16_t getMaxUserPort() const;
 private:
 	uint32_t timeWaitDelay_;

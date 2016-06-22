@@ -31,7 +31,7 @@ void HttpServer::stop() {
 }
 
 void HttpServer::start() {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	server_.setSocketPool(
 		HttpServerConfigFacade::getInstance().getInitalUserConnection(),
@@ -126,7 +126,7 @@ void HttpServer::onNewConnection(rapid::ConnectionPtr &pConn) {
 }
 
 HttpContextPtr HttpServer::createHttpContext() {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	if (HttpServerConfigFacade::getInstance().isUseSSL())
 		return HttpContextPtr(HttpServerConfigFacade::getInstance().getHttpsContextPool().borrowObject());
@@ -134,7 +134,7 @@ HttpContextPtr HttpServer::createHttpContext() {
 }
 
 HttpContextPtr HttpServer::removeHttpContext(size_t id) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
 	auto itr = contextMap_.find(id);

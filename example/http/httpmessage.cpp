@@ -418,7 +418,7 @@ bool HttpResponse::send(rapid::ConnectionPtr &pConn, HttpRequestPtr httpRequest)
 }
 
 bool HttpResponse::writeContent(rapid::IoBuffer *pSendBuffer) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	state_ = SEND_HTTP_CONTENT;
 	// 如果是HTTPs無法一次傳送很大的buffer, 因為加密後的緩衝區會變大
 	//auto bytesRead = pSendBuffer->writeable();

@@ -22,7 +22,7 @@ std::string dumpStackTrace();
 
 std::string getStackTrace(EXCEPTION_POINTERS const *exceptionPtr);
 
-std::string dumpStackTrace(CONTEXT const *context);
+std::string logStackInfo(CONTEXT const *context);
 
 }
 

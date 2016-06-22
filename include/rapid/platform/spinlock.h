@@ -6,6 +6,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 
 #include <rapid/platform/platform.h>
 
@@ -36,6 +37,11 @@ private:
 	static DWORD constexpr SPIN_COUNT = (0x80000000 | 4000);
     std::unique_ptr<CRITICAL_SECTION> pCS_;
 };
+
+template <typename TryLockable>
+std::unique_lock<TryLockable> tryToLock(TryLockable& lockable) {
+	return std::unique_lock<TryLockable>(lockable, std::try_to_lock);
+}
 
 __forceinline Spinlock::Spinlock()
     : pCS_(std::make_unique<CRITICAL_SECTION>()) {

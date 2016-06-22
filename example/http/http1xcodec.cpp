@@ -50,7 +50,7 @@ void Http1xCodec::parse(rapid::IoBuffer* buffer, rapid::ConnectionPtr& pConn) {
 
 	if (retval == -2) {
 		// Request incomplete.
-		RAPID_LOG_WARN_STACK_TRACE() << "Request incomplete!";
+		RAPID_LOG_WARN() << "Request incomplete!";
 	} else if (retval > 0) {
 		buffer->retrieve(bytesRead);
 
@@ -66,7 +66,7 @@ void Http1xCodec::parse(rapid::IoBuffer* buffer, rapid::ConnectionPtr& pConn) {
 		pHttpRequest_->setUri(path, pathLen);
 		dispatcher_->onMessage(pHttpRequest_->method(), pConn, pHttpRequest_);
 	} else {
-		RAPID_LOG_WARN_STACK_TRACE() << "Parse error!";
+		RAPID_LOG_WARN() << "Parse error!";
 		throw MalformedDataException();
 	}
 }

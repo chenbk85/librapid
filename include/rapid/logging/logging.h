@@ -101,6 +101,11 @@ private:
     LogEntry entry_;
 };
 
+struct AvoidsCompilerWarnings {
+	AvoidsCompilerWarnings() = default;
+	void operator&(std::ostream const &s) noexcept { }
+};
+
 }
 
 }
@@ -108,6 +113,9 @@ private:
 #define RAPID_LOG(Level) \
     if (Level <= rapid::logging::getLogLevel()) \
         rapid::logging::LogEntryWrapper::LogEntryWrapper(__FILE__, __LINE__, __FUNCTION__, Level).stream()
+
+#define RAPID_LOG_IF(Level, condition) \
+	!(condition) ? (void) 0 : rapid::logging::AvoidsCompilerWarnings() & rapid::logging::LogEntryWrapper::LogEntryWrapper(__FILE__, __LINE__, __FUNCTION__, Level).stream()
 
 #define RAPID_LOG_FATAL() RAPID_LOG(rapid::logging::Fatal)
 #define RAPID_LOG_ERROR() RAPID_LOG(rapid::logging::Error)
@@ -117,7 +125,5 @@ private:
 
 #define RAPID_LOG_FUNC_NAME() __FUNCTION__##"() "
 
-#define RAPID_LOG_TRACE_STACK_TRACE() RAPID_LOG_TRACE() << RAPID_LOG_FUNC_NAME()
-#define RAPID_LOG_ERROR_STACK_TRACE() RAPID_LOG_ERROR() << RAPID_LOG_FUNC_NAME()
-#define RAPID_LOG_WARN_STACK_TRACE()  RAPID_LOG_WARN()  << RAPID_LOG_FUNC_NAME()
-#define RAPID_LOG_FATAL_STACK_TRACE() RAPID_LOG_FATAL() << RAPID_LOG_FUNC_NAME()
+#define RAPID_TRACE_CALL() RAPID_LOG_TRACE() << RAPID_LOG_FUNC_NAME()
+

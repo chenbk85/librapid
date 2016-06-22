@@ -110,7 +110,7 @@ LoggingWorker::LoggingWorker()
 	writterThread_ = std::thread([this] {
 		_alloca(CACHE_LINE_PAD_SIZE);
 		std::function<void()> action;
-        lastWriteTime_.reset();		
+        lastWriteTime_.reset();
         while (!stopped_) {
             if (!queue_.dequeue(action)) {
                 auto lastWriteTime = lastWriteTime_.elapsed<std::chrono::microseconds>();

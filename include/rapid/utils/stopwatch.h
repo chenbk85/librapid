@@ -14,38 +14,38 @@ namespace utils {
 template <typename Clock>
 class Stopwatch final {
 public:
-    Stopwatch() throw();
+    Stopwatch() noexcept;
 
     template <typename U>
-    typename U::rep elapsedCount() const throw();
+    typename U::rep elapsedCount() const noexcept;
 
     template <typename U>
-    typename U elapsed() const throw();
+    typename U elapsed() const noexcept;
 
-    void reset() throw();
+    void reset() noexcept;
 private:
     std::chrono::time_point<Clock> startTimePoint_;
 };
 
 template <typename Clock>
-inline Stopwatch<Clock>::Stopwatch() throw()
+inline Stopwatch<Clock>::Stopwatch() noexcept
     : startTimePoint_(Clock::now()) {
 }
 
 template <typename Clock>
 template <typename U>
-inline typename U::rep Stopwatch<Clock>::elapsedCount() const throw() {
+inline typename U::rep Stopwatch<Clock>::elapsedCount() const noexcept {
     return elapsed<U>().count();
 }
 
 template <typename Clock>
 template <typename U>
-inline typename U Stopwatch<Clock>::elapsed() const throw() {
+inline typename U Stopwatch<Clock>::elapsed() const noexcept {
     return std::chrono::duration_cast<U>(Clock::now() - startTimePoint_);
 }
 
 template <typename Clock>
-inline void Stopwatch<Clock>::reset() throw() {
+inline void Stopwatch<Clock>::reset() noexcept {
     startTimePoint_ = Clock::now();
 }
 

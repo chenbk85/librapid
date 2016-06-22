@@ -57,7 +57,7 @@ void IoEventDispatcher::postQuit() const {
 }
 
 void IoEventDispatcher::waitForIoLoop(uint32_t timeout) const {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	// NOTE: 
 	// IOCP 並行的機會發生在此!

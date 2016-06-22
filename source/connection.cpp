@@ -111,7 +111,7 @@ void Connection::updateAcceptContext() {
 }
 
 void Connection::postAsync(std::function<void(ConnectionPtr)> handler) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	pPostBuffer_->setCompleteHandler(handler);
 	pPostBuffer_->ioFlag = details::IOFlags::IO_POST_PENDDING;
 	details::IoEventDispatcher::getInstance().post(reinterpret_cast<ULONG_PTR>(this), pPostBuffer_.get());
@@ -242,7 +242,7 @@ void Connection::sendAndDisconnec() {
 }
 
 void Connection::onSend(IoBuffer *pBuffer, uint32_t bytesTransferred) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	
 	pBuffer->retrieve(bytesTransferred);
 
@@ -257,7 +257,7 @@ void Connection::onSend(IoBuffer *pBuffer, uint32_t bytesTransferred) {
 }
 
 void Connection::onReceive(IoBuffer *pBuffer, uint32_t bytesTransferred) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	if (bytesTransferred > 0) {
 		pBuffer->advanceWriteIndex(bytesTransferred);
@@ -284,7 +284,7 @@ void Connection::onConnectionError(uint32_t error) {
 }
 
 void Connection::onConnectionReset() {
-	RAPID_LOG_TRACE_STACK_TRACE() << " Connection reset!";
+	RAPID_TRACE_CALL() << " Connection reset!";
 	
 	isSendShutdown_ = true;
 	isRecvShutdown_ = true;
@@ -293,7 +293,7 @@ void Connection::onConnectionReset() {
 }
 
 bool Connection::receiveAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBuffer * __restrict pBuffer, uint32_t * __restrict numByteRecv) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	DWORD flags = MSG_PARTIAL;
 
@@ -324,7 +324,7 @@ bool Connection::receiveAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBu
 }
 
 bool Connection::sendAsync(WSABUF * __restrict iovec, uint32_t numIovec, IoBuffer * __restrict pBuffer, uint32_t * __restrict numByteSend) {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 
 	pBuffer->ioFlag = details::IOFlags::IO_SEND_PENDDING;
 
@@ -431,7 +431,7 @@ void Connection::addReuseTimingWheel() {
 }
 
 void Connection::onDisconnected() {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
 	pDisconnectBuffer_->onComplete(shared_from_this());
 	isReuseSocket_ = true;
 	if (halfClosedState_ == ACTIVE_CLOSE) {
@@ -445,7 +445,7 @@ void Connection::onDisconnected() {
 }
 
 void Connection::disconnect() {
-	RAPID_LOG_TRACE_STACK_TRACE();
+	RAPID_TRACE_CALL();
     if (disconnectAsync()) {
         onDisconnected();
     }

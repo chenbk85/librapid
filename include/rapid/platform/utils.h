@@ -93,6 +93,8 @@ int64_t getFileSize(std::string const &filePath);
 
 void prefetchVirtualMemory(char const * virtualAddress, size_t size);
 
+std::vector<std::string> getInterfaceNameList();
+
 }
 
 }
