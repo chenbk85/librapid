@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <thread>
+
 #include <rapid/objectpool.h>
 #include <rapid/utils/singleton.h>
 
@@ -19,6 +21,7 @@
 static uint32_t constexpr SIZE_4KB = 4 * 1024;
 static uint32_t constexpr SIZE_16KB = 16 * 1024;
 static uint32_t constexpr SIZE_64KB = 64 * 1024;
+static uint32_t constexpr SIZE_128KB = 128 * 1024;
 static uint32_t constexpr SIZE_1MB = 1024 * 1024;
 static uint32_t constexpr SIZE_10MB = 10 * SIZE_1MB;
 
@@ -39,7 +42,7 @@ public:
 	HttpServerConfigFacade(const HttpServerConfigFacade &) = delete;
 	HttpServerConfigFacade& operator=(HttpServerConfigFacade const &) = delete;
 
-	void loadXmlConfigFile(std::string const &filePath);
+	void loadConfiguration(std::string const &filePath);
 
 	FileCacheManager& getFileCacheManager() noexcept;
 
@@ -88,11 +91,13 @@ public:
 	uint16_t getNumaNode() const noexcept;
 
 private:
-	FileCacheManager fileCacheManager_;
+	void reloadConfiguration(std::string const &filePath);
+
 	bool enableHttp2Proto_ : 1;
 	bool enableSSLProto_ : 1;
-	int listenPort_;
+	volatile bool stoppedMonitor_ : 1;
 	bool upgradeableHttp2_ : 1;
+	int listenPort_;
 	uint16_t numaNode_;
 	uint32_t bufferSize_;
 	uint32_t maxUserConnection_;
@@ -112,6 +117,8 @@ private:
 	Http2StreamPool http2StreamPool_;
 	HttpContextPool httpContextPool_;
 	HttpsContextPool httpsContextPool_;
+	FileCacheManager fileCacheManager_;
+	std::thread configChangeMonitorThread_;
 };
 
 __forceinline uint32_t HttpServerConfigFacade::getInitalUserConnection() const noexcept {

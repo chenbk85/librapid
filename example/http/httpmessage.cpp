@@ -420,9 +420,14 @@ bool HttpResponse::send(rapid::ConnectionPtr &pConn, HttpRequestPtr httpRequest)
 bool HttpResponse::writeContent(rapid::IoBuffer *pSendBuffer) {
 	RAPID_TRACE_CALL();
 	state_ = SEND_HTTP_CONTENT;
-	// 如果是HTTPs無法一次傳送很大的buffer, 因為加密後的緩衝區會變大
-	//auto bytesRead = pSendBuffer->writeable();
-	auto bytesRead = (std::max)(pSendBuffer->size() - pSendBuffer->getWrittenSize(),
-		pSendBuffer->goodSize());
+	uint32_t bytesRead = 0;
+	if (HttpServerConfigFacade::getInstance().isUseSSL()) {
+		// 如果是HTTPs無法一次傳送很大的buffer, 因為加密後的緩衝區會變大
+		bytesRead = (std::max)(pSendBuffer->writeable(), pSendBuffer->goodSize());
+	} else {
+		bytesRead = pSendBuffer->writeable();
+	}
+	RAPID_LOG_IF(rapid::logging::Warn, bytesRead > pSendBuffer->goodSize()) << bytesRead;
 	return pFileReader_->read(pSendBuffer, bytesRead);
+	
 }

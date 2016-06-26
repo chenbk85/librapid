@@ -223,10 +223,7 @@ std::string IoBuffer::read(uint32_t size) {
 
 std::string IoBuffer::readAll() {
     RAPID_ENSURE(!isEmpty());
-    auto readableBytes = readable();
-    auto const startIndex = readIndex_;
-    retrieve(readableBytes);
-    return std::string(begin() + startIndex, readableBytes);
+	return read(readable());
 }
 
 void IoBuffer::reset() noexcept {

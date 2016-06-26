@@ -324,6 +324,9 @@
     <ClInclude Include="..\..\include\rapid\utils\threadpool.h">
       <Filter>Header Files\utils</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rapid\platform\filesystemmonitor.h">
+      <Filter>Source Files\platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\iobuffer.cpp">
@@ -505,6 +508,9 @@
     </ClCompile>
     <ClCompile Include="..\..\source\details\socketacceptpoller.cpp">
       <Filter>Source Files\details</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\platform\filesystemmonitor.cpp">
+      <Filter>Source Files\platform</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

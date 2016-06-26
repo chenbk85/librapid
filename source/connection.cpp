@@ -238,6 +238,9 @@ void Connection::sendAndDisconnec() {
 	if (pBuffer->isEmpty()) {
 		acceptSocket_.shutdownSend();
 		disconnect();
+	} else {
+		isSendShutdown_ = true;
+		pBuffer->send(shared_from_this());
 	}
 }
 
@@ -251,7 +254,8 @@ void Connection::onSend(IoBuffer *pBuffer, uint32_t bytesTransferred) {
 			acceptSocket_.shutdownSend();
 			disconnect();
 		} else {
-			pSendBuffer_->onComplete(shared_from_this());
+			auto pThis = shared_from_this();
+			pSendBuffer_->onComplete(pThis);
 		}
 	}
 }
@@ -261,7 +265,8 @@ void Connection::onReceive(IoBuffer *pBuffer, uint32_t bytesTransferred) {
 
 	if (bytesTransferred > 0) {
 		pBuffer->advanceWriteIndex(bytesTransferred);
-		pReceiveBuffer_->onComplete(shared_from_this());
+		auto pThis = shared_from_this();
+		pReceiveBuffer_->onComplete(pThis);
 	} else {
 		RAPID_LOG_TRACE() << "Peer shutdwon send";		
 		halfClosedState_ = GRACEFUL_SHUTDOWN;		
@@ -411,7 +416,8 @@ void Connection::onAcceptConnection(uint32_t acceptSize) {
     if (acceptSize > 0) {
         pReceiveBuffer_->advanceWriteIndex(acceptSize);
     }
-	pAcceptBuffer_->onComplete(shared_from_this());
+	auto pThis = shared_from_this();
+	pAcceptBuffer_->onComplete(pThis);
 }
 
 void Connection::addReuseTimingWheel() {
@@ -432,7 +438,8 @@ void Connection::addReuseTimingWheel() {
 
 void Connection::onDisconnected() {
 	RAPID_TRACE_CALL();
-	pDisconnectBuffer_->onComplete(shared_from_this());
+	auto pThis = shared_from_this();
+	pDisconnectBuffer_->onComplete(pThis);
 	isReuseSocket_ = true;
 	if (halfClosedState_ == ACTIVE_CLOSE) {
         // 主動關閉連線會讓Tcp連線狀態進入TIME_WAIT, 所以加入accept pending queue中.
@@ -459,8 +466,6 @@ void Connection::cancelPendingRequest() {
 }
 
 void Connection::abortConnection(Exception const &e) {
-	RAPID_LOG_WARN() << "Exception: " << std::dec << e.error() << ", " << e.what();
-
     cancelPendingRequest();
 	
 	// More socket erorr code:
@@ -509,8 +514,10 @@ void Connection::onCompletion(IoBuffer *pBuffer, uint32_t bytesTransferred) {
     case details::IOFlags::IO_SEND_FILE_PENDDING:
 		onSend(pBuffer, bytesTransferred);
         break;
-	case details::IOFlags::IO_POST_PENDDING:
-		pPostBuffer_->onComplete(shared_from_this());
+	case details::IOFlags::IO_POST_PENDDING:{
+			auto pThis = shared_from_this();
+			pPostBuffer_->onComplete(pThis);
+		}
 		break;
     default:
 		// NOTE: Not accept connection, peer abort connection!
@@ -523,15 +530,15 @@ void Connection::onIoCompletion(IoBuffer *pBuffer, uint32_t bytesTransferred) {
     try {
 		onCompletion(pBuffer, bytesTransferred);
     } catch (Exception const &e) {
-		RAPID_LOG_FATAL() << e.what();
+		RAPID_LOG_WARN() << "Exception: " << std::dec << e.error() << ", " << e.what();
 		halfClosedState_ = ACTIVE_CLOSE;
         abortConnection(e);
     } catch (ExceptionWithMinidump const &e) {
-        RAPID_LOG_FATAL() << e.what();
+		RAPID_LOG_WARN() << e.what();
 		halfClosedState_ = ACTIVE_CLOSE;
 		disconnectAsync();
 	} catch (std::exception const &e) {
-		RAPID_LOG_FATAL() << e.what();
+		RAPID_LOG_WARN() << e.what();
 		halfClosedState_ = ACTIVE_CLOSE;
 		disconnectAsync();
 	}

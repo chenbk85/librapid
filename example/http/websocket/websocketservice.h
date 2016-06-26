@@ -1,9 +1,9 @@
+//---------------------------------------------------------------------------------------------------------------------
+// Copyright (c) 2015-2016 librapid project. All rights reserved.
+// More license information, please see LICENSE file in module root folder.
+//---------------------------------------------------------------------------------------------------------------------
+
 #pragma once
-
-#include <string>
-
-#include <rapid/connection.h>
-#include <rapid/details/timingwheel.h>
 
 #include "../httpcontext.h"
 #include "websocketcodec.h"
@@ -16,10 +16,10 @@ public:
 
 	static std::shared_ptr<WebSocketService> createService(std::string const &protocol);
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) = 0;
+	virtual void onOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) = 0;
 
-	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) = 0;
+	virtual bool onMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) = 0;
 
-	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) = 0;
+	virtual void onClose(rapid::ConnectionPtr &pConn) = 0;
 };
 

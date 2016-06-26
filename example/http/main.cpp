@@ -18,9 +18,9 @@
 //#define ENABLE_FAKE_HTTP_SERVER
 
 #ifdef ENABLE_FAKE_HTTP_SERVER
-std::weak_ptr<FakeHttpServer> httpServer;
+std::weak_ptr<FakeHttpServer> pHttpServerInstance;
 #else
-std::weak_ptr<HttpServer> httpServer;
+std::weak_ptr<HttpServer> pHttpServerInstance;
 #endif
 
 BOOL WINAPI consoleHandler(DWORD consoleEvent) {
@@ -30,7 +30,7 @@ BOOL WINAPI consoleHandler(DWORD consoleEvent) {
     case CTRL_BREAK_EVENT:
     case CTRL_CLOSE_EVENT:
     case CTRL_SHUTDOWN_EVENT:
-		if (auto server = httpServer.lock()) {
+		if (auto server = pHttpServerInstance.lock()) {
 			server->stop();
 		}
         return TRUE;
@@ -40,7 +40,7 @@ BOOL WINAPI consoleHandler(DWORD consoleEvent) {
 }
 
 void httpServerMain(int argc, char *argv[]) {
-	HttpServerConfigFacade::getInstance().loadXmlConfigFile(argv[1]);
+	HttpServerConfigFacade::getInstance().loadConfiguration(argv[1]);
 
 #ifdef ENABLE_FAKE_HTTP_SERVER
 	// IPV4 binding
@@ -61,7 +61,7 @@ void httpServerMain(int argc, char *argv[]) {
 #endif
 #endif
 
-	httpServer = pServerTemp;
+	pHttpServerInstance = pServerTemp;
 	pServerTemp->start();
 }
 
@@ -76,13 +76,17 @@ R"(	 _____ _____ _____ _____    _____
 int main(int argc, char *argv[]) {
 	std::cout << s_title << std::endl;
 
+	SCOPE_EXIT() {
+		rapid::logging::stopLogging();
+	};
+
 	// Setup console handler, we want to 'Ctrl + C' stopping server.
 	::SetConsoleCtrlHandler(consoleHandler, TRUE);
 
 	try {
         httpServerMain(argc, argv);
 	} catch (std::exception const &e) {
-		RAPID_LOG_FATAL() << e.what();
+		std::cerr << e.what();
 		std::cin.get();
 	}
 }

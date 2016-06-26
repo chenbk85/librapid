@@ -1,6 +1,9 @@
 #include <fstream>
 #include <string>
 
+#include <rapid/logging/logging.h>
+#include <rapid/exception.h>
+
 #include "httpstaticheadertable.h"
 
 HttpStaticHeaderTable::HttpStaticHeaderTable() {
@@ -8,6 +11,9 @@ HttpStaticHeaderTable::HttpStaticHeaderTable() {
 	std::string str;
 
 	headerHashTable_.resize(HASH_TABLE_SIZE);
+
+	if (!file.is_open())
+		throw rapid::Exception("Not found file (headers.txt)");
 
 	while (file >> str) {
 		auto hashValue = HttpStaticHeaderTable::hash(str);

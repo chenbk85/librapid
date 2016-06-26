@@ -228,23 +228,22 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 	auto pWebSocketDispatcher = std::make_shared<MessageDispatcher<WebSocketRequest>>();
 	
 	pWebSocketDispatcher->addMessageEventHandler(WS_MESSAGE,
-		[this](rapid::ConnectionPtr &conn, WebSocketRequestPtr webSocketRequest) {
-		pWebSocketRequest_ = webSocketRequest;
+		[this](rapid::ConnectionPtr &conn, WebSocketRequestPtr pWebSocketRequest) {
+		pWebSocketRequest_ = pWebSocketRequest;
 		onWebSocketMessage(conn);
 	});
 
 	pHttpCodec_ = std::make_unique<WebSocketCodec>(pWebSocketDispatcher);
-
 	auto pContext = shared_from_this();
 
 	// Set handler to read WebSocket data
 	pConn->setSendEventHandler([this, pContext](rapid::ConnectionPtr conn) {
-		pWebSocketService_->onWebSocketOpen(conn, pContext);
+		pWebSocketService_->onOpen(conn, pContext);
 		readLoop(conn);
 	});
 
 	if (pConn->sendAsync()) {
-		pWebSocketService_->onWebSocketOpen(pConn, pContext);
+		pWebSocketService_->onOpen(pConn, pContext);
 		readLoop(pConn);
 	}
 }
@@ -252,7 +251,7 @@ void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
 void HttpContext::onWebSocketMessage(rapid::ConnectionPtr &pConn) {
 	RAPID_TRACE_CALL();
 
-	if (pWebSocketService_->onWebSocketMessage(pConn, pWebSocketRequest_)) {
+	if (pWebSocketService_->onMessage(pConn, pWebSocketRequest_)) {
 		readLoop(pConn);
 	}
 }
@@ -261,7 +260,7 @@ void HttpContext::onDisconnect(rapid::ConnectionPtr &pConn) {
 	RAPID_TRACE_CALL();
 
 	if (pWebSocketService_ != nullptr) {
-		pWebSocketService_->onWebSocketClose(pConn);
+		pWebSocketService_->onClose(pConn);
 		pWebSocketService_.reset();
 	}
 }

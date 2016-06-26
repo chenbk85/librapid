@@ -1,3 +1,8 @@
+//---------------------------------------------------------------------------------------------------------------------
+// Copyright (c) 2015-2016 librapid project. All rights reserved.
+// More license information, please see LICENSE file in module root folder.
+//---------------------------------------------------------------------------------------------------------------------
+
 #include <unordered_map>
 #include <vector>
 #include <chrono>
@@ -10,15 +15,13 @@
 
 #include <rapid/iobuffer.h>
 #include <rapid/platform/performancecounter.h>
-#include <rapid/platform/tcpipparameters.h>
 #include <rapid/platform/utils.h>
+#include <rapid/platform/spinlock.h>
 #include <rapid/logging/logging.h>
 #include <rapid/utils/mpmc_bounded_queue.h>
 #include <rapid/utils/threadpool.h>
 #include <rapid/utils/stopwatch.h>
-#include <rapid/platform/spinlock.h>
 #include <rapid/details/timingwheel.h>
-#include <rapid/utils/stopwatch.h>
 #include <rapid/utils/stringutilis.h>
 
 #include "websocketservice.h"
@@ -64,8 +67,8 @@ static uint32_t makeUniqueMessageId() {
 class BroadcastChannel {
 public:
 	BroadcastChannel(std::string const &name, int maxExpireSecs)
-		: name_(name)
-		, maxExpireSecs_(maxExpireSecs) {
+		: maxExpireSecs_(maxExpireSecs)
+		, name_(name) {
 	}
 
 	std::string name() const {
@@ -237,7 +240,7 @@ public:
 	void push(std::string const &message) {
 		RAPID_TRACE_CALL();
 		std::lock_guard<rapid::platform::Spinlock> guard{ lock_ };
-		auto subscribeList = getSubscribeList();
+		auto subscribeList = getSubscribe();
 		for (auto const &subscribe : subscribeList) {
 			mananger_.pushMessage(subscribe, "", message);
 		}
@@ -249,11 +252,9 @@ public:
 	}
 
 private:
-	std::vector<std::string> getSubscribeList() {
+	std::vector<std::string> getSubscribe() {
 		RAPID_TRACE_CALL();
-
 		std::lock_guard<rapid::platform::Spinlock> guard{ s_lock };
-
 		std::vector<std::string> userlist;
 		for (auto &user : connlist_) {
 			userlist.push_back(user.first);
@@ -290,8 +291,8 @@ private:
 		}
 	}
 
+	volatile bool stopped_ : 1;
 	mutable rapid::platform::Spinlock lock_;
-	volatile bool stopped_;
 	std::unordered_map<std::string, rapid::ConnectionPtr> connlist_;
 	BroadcastChannelManager mananger_;	
 	std::thread pushThread_;
@@ -313,7 +314,7 @@ public:
 	virtual ~WebSocketChatService() {
 	}
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+	virtual void onOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
 		MessagePusher::getInstance().subscribe(std::to_string(uid_), pConn);
 
 		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
@@ -325,12 +326,13 @@ public:
 		addUidMessage(uid_);
 	}
 
-	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
+	virtual bool onMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
 		if (webSocketRequest->isClosed()) {
-			onWebSocketClose(pConn);
+			onClose(pConn);
 			return false;
 		}
-		auto message = parse(webSocketRequest->content());
+		auto pBuffer = pConn->getReceiveBuffer();
+		auto message = parse(pBuffer->readAll());
 		if (message.types == MSG_TYPE_USERNAME) {			
 			username_ = message.content;
 			addUserlist(uid_, username_);
@@ -342,7 +344,7 @@ public:
 		return true;
 	}
 
-	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
+	virtual void onClose(rapid::ConnectionPtr &pConn) override {
 		MessagePusher::getInstance().unSubscribe(username_);
 		removeUserlist(uid_);
 		updateUserlistMessage(getUserlist());
@@ -460,31 +462,46 @@ public:
 
 	}
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
-		pContext->readLoop(pConn);
+	virtual void onOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
+			pContext->readLoop(conn);
+		});
 	}
 
-	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
-		bool isSendCompleted = true;
+	virtual bool onMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> pWebSocketRequest) override {
+		auto isSendCompleted = false;
 
-		if (!webSocketRequest->isClosed()) {
-			auto pReceiveBuffer = pConn->getReceiveBuffer();
-			auto content = pReceiveBuffer->read(pReceiveBuffer->readable());
-			WebSocketResponse resp;
-			auto pSendBuffer = pConn->getSendBuffer();
+		if (pWebSocketRequest->isClosed()) {
+			onClose(pConn);
+			return true;
+		}
+		
+		WebSocketResponse resp;
+		auto pSendBuffer = pConn->getSendBuffer();
+		auto pReceiveBuffer = pConn->getReceiveBuffer();
+		pReceiveBuffer->retrieve(pWebSocketRequest->contentLength());
+		if (!pWebSocketRequest->isTextFormat()) {
+			auto content = std::to_string(pWebSocketRequest->contentLength());
 			resp.setContentLength(content.length());
 			resp.serialize(pSendBuffer);
 			pSendBuffer->append(content);
 			isSendCompleted = pConn->sendAsync();
 		} else {
-			onWebSocketClose(pConn);
+			isSendCompleted = true;
 		}
 
 		return isSendCompleted;
 	}
 
-	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
-
+	virtual void onClose(rapid::ConnectionPtr &pConn) override {
+		/*
+		auto pSendBuffer = pConn->getSendBuffer();
+		WebSocketResponse resp;
+		resp.setCodec(WebSocketOpcodes::WS_OP_CLOSED);
+		resp.setContentLength(0);
+		resp.serialize(pSendBuffer);
+		pConn->sendAndDisconnec();
+		*/
 	}
 };
 
@@ -493,7 +510,7 @@ public:
 	WebSocketPerfmonService() {
 		auto interfaceList = rapid::platform::getInterfaceNameList();
 		for (auto & interface : interfaceList) {
-			// Performance counter 需要將'C', ')'換成'[', ']'
+			// Performance counter 需要將'(', ')'換成'[', ']'
 			rapid::utils::replace(interface, "(", "[");
 			rapid::utils::replace(interface, ")", "]");
 			RAPID_LOG_TRACE() << "Interface: " << interface;
@@ -518,7 +535,7 @@ public:
 	virtual ~WebSocketPerfmonService() {
 	}
 
-	virtual void onWebSocketOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
+	virtual void onOpen(rapid::ConnectionPtr &pConn, std::shared_ptr<HttpContext> pContext) override {
 		pusher_.subscribe(std::to_string(uid_), pConn);
 		pConn->setSendEventHandler([pContext](rapid::ConnectionPtr &conn) {
 			auto pBuffer = conn->getReceiveBuffer();
@@ -531,16 +548,16 @@ public:
 		}, 1000);
 	}
 
-	virtual bool onWebSocketMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
+	virtual bool onMessage(rapid::ConnectionPtr &pConn, std::shared_ptr<WebSocketRequest> webSocketRequest) override {
 		if (webSocketRequest->isClosed()) {
-			onWebSocketClose(pConn);
+			onClose(pConn);
 			return false;
 		}
 		pushMessage();
 		return true;
 	}
 
-	virtual void onWebSocketClose(rapid::ConnectionPtr &pConn) override {
+	virtual void onClose(rapid::ConnectionPtr &pConn) override {
 		pusher_.unSubscribe(std::to_string(uid_));
 	}
 

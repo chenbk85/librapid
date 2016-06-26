@@ -7,13 +7,15 @@
 #include <functional>
 #include <unordered_map>
 
+#include <rapidxml/rapidxml.hpp>
+#include <rapidxml/rapidxml_utils.hpp>
+
 #include <rapid/logging/logging.h>
 #include <rapid/logging/utilis.h>
 
-#include <rapid/utils/stringutilis.h>
+#include <rapid/platform/filesystemmonitor.h>
 
-#include <rapidxml/rapidxml.hpp>
-#include <rapidxml/rapidxml_utils.hpp>
+#include <rapid/utils/stringutilis.h>
 
 #include "httpserverconfigfacade.h"
 
@@ -26,6 +28,8 @@ static rapid::logging::Level getLogLevel(std::string const &str) {
 		{ "Trace",  rapid::logging::Trace },
 	};
 	auto itr = levelTables.find(str);
+	if (itr == levelTables.end())
+		throw std::exception("Invalid logging level!");
 	return (*itr).second;
 }
 
@@ -71,8 +75,9 @@ static void createAppenderFromSetting(std::map<std::string, rapidxml::xml_node<c
 HttpServerConfigFacade::HttpServerConfigFacade()
 	: enableHttp2Proto_(false)
 	, enableSSLProto_(false)
-	, listenPort_(80)
 	, upgradeableHttp2_(false)
+	, stoppedMonitor_(true)
+	, listenPort_(80)
 	, numaNode_(0)
 	, bufferSize_(0)
 	, maxUserConnection_(0)
@@ -80,10 +85,12 @@ HttpServerConfigFacade::HttpServerConfigFacade()
 }
 
 HttpServerConfigFacade::~HttpServerConfigFacade() {
-	rapid::logging::stopLogging();
+	stoppedMonitor_ = true;
+	if (configChangeMonitorThread_.joinable())
+		configChangeMonitorThread_.join();
 }
 
-void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
+void HttpServerConfigFacade::loadConfiguration(std::string const &filePath) {
 	rapidxml::file<> xmlFile(filePath.c_str());
 	rapidxml::xml_document<> doc;
 	doc.parse<0>(xmlFile.data());
@@ -98,7 +105,7 @@ void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
 		listenPort_ = std::strtoul(tcpSettings["Port"].c_str(), nullptr, 10);
 		initialUserConnection_ = std::strtoul(tcpSettings["InitialUserConnection"].c_str(), nullptr, 10);
 		maxUserConnection_ = std::strtoul(tcpSettings["MaxUserConnection"].c_str(), nullptr, 10);
-		bufferSize_ = SIZE_64KB * 2;
+		bufferSize_ = SIZE_128KB;
 		numaNode_ = std::strtoul(tcpSettings["NumaNode"].c_str(), nullptr, 10);
 	}
 
@@ -118,9 +125,9 @@ void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
 
 	std::map<std::string, std::string> sslSettings;
 	auto ssl = (*httpServer).first_node("SSL");
-	if (!ssl) {
+	if (ssl != nullptr) {
 		readXmlSettings(ssl, sslSettings);
-		// Setting Http config
+		// Setting SSL config
 		{
 			certificateFilePath_ = sslSettings["CertificateFilePath"];
 			privateKeyFilePath_ = sslSettings["PrivateKeyFilePath"];
@@ -129,14 +136,70 @@ void HttpServerConfigFacade::loadXmlConfigFile(std::string const &filePath) {
 
 	std::map<std::string, std::string> loggerSettings;
 	auto logger = (*httpServer).first_node("Logger");
-	readXmlSettings(logger, loggerSettings);
+	if (logger != nullptr) {
+		readXmlSettings(logger, loggerSettings);
+		if (loggerSettings.empty()) {
+			// TDOO: throw an exception?
+			return;
+		}
+		rapid::logging::startLogging(getLogLevel(loggerSettings["Level"]));
+		std::vector<std::shared_ptr<rapid::logging::LogAppender>> appenders;
+		std::map<std::string, rapidxml::xml_node<char> *> settings;
+		readAppenderSettring(logger, settings);
+		if (settings.empty()) {
+			// TDOO: throw an exception?
+			return;
+		}
+		createAppenderFromSetting(settings, appenders);
+	} else {
+		// TDOO: throw an exception?
+		return;
+	}
 
-	rapid::logging::startLogging(getLogLevel(loggerSettings["Level"]));
+	stoppedMonitor_ = false;
 
-	std::vector<std::shared_ptr<rapid::logging::LogAppender>> appenders;
-	std::map<std::string, rapidxml::xml_node<char> *> settings;
-	readAppenderSettring(logger, settings);
-	createAppenderFromSetting(settings, appenders);
+	configChangeMonitorThread_ = std::thread([this, filePath]() {
+		auto tmp = filePath;
+		tmp.erase(tmp.rfind("\\"));
+		rapid::platform::FileSystemWatcher watcher(rapid::utils::fromBytes(tmp));
+
+		while (!stoppedMonitor_) {
+			auto changedFile = watcher.getChangedFile();
+
+			if (!changedFile.empty()) {
+				RAPID_LOG_INFO() << "File configuration changed!";
+				try {
+					reloadConfiguration(filePath);
+				} catch (std::exception const &e) {
+					RAPID_LOG_FATAL() << e.what();
+				}				
+			} else {
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			}				
+		}
+	});
+}
+
+void HttpServerConfigFacade::reloadConfiguration(std::string const &filePath) {
+	rapidxml::file<> xmlFile(filePath.c_str());
+	rapidxml::xml_document<> doc;
+	doc.parse<0>(xmlFile.data());
+
+	// TODO: reload some other configuration?
+
+	auto httpServer = doc.first_node("HttpServer");
+	std::map<std::string, std::string> loggerSettings;
+	auto logger = (*httpServer).first_node("Logger");
+	if (logger != nullptr) {
+		readXmlSettings(logger, loggerSettings);
+		if (loggerSettings.empty()) {
+			// TDOO: throw an exception?
+			return;
+		}
+		auto level = loggerSettings["Level"];
+		RAPID_LOG_INFO() << "New logging level: " << level;
+		rapid::logging::setLogLevel(getLogLevel(level));
+	}
 }
 
 HttpStaticHeaderTable const & HttpServerConfigFacade::getHeadersTable() const {

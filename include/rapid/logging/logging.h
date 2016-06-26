@@ -103,7 +103,7 @@ private:
 
 struct AvoidsCompilerWarnings {
 	AvoidsCompilerWarnings() = default;
-	void operator&(std::ostream const &s) noexcept { }
+	void operator&(std::ostream const &s) const noexcept { }
 };
 
 }

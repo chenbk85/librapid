@@ -6,7 +6,6 @@
 #pragma once
 
 #include <memory>
-#include <map>
 
 #include "../messagedispatcher.h"
 #include "../httpcodec.h"
@@ -41,18 +40,16 @@ public:
 
 	bool isPong() const noexcept;
 
-	uint64_t getConetentLength() const noexcept;
+	void setContentLength(uint64_t contentLength) noexcept;
 
-	std::string content() const;
-
-	void setContent(std::string const &content);
+	uint64_t contentLength() const noexcept;
 
 protected:
 	virtual void doSerialize(rapid::IoBuffer *pBuffer) override;
 
 private:
 	WebSocketOpcodes opcode_;
-	std::string content_;
+	uint64_t contentLength_;
 };
 
 class WebSocketResponse : public MessageContext {
@@ -61,15 +58,32 @@ public:
 	
 	virtual ~WebSocketResponse();
 
+	void setCodec(WebSocketOpcodes opcodec);
+
 	void setContentLength(uint64_t length);
 protected:
 	virtual void doSerialize(rapid::IoBuffer *pBuffer) override;
+	WebSocketOpcodes opcodec_;
 	char mask_[WS_MASK_SIZE];
 	uint64_t contentLength_;
 };
 
 class WebSocketFrameReader {
 public:
+	WebSocketFrameReader();
+
+	WebSocketFrameReader(WebSocketFrameReader const &) = delete;
+	WebSocketFrameReader& operator=(WebSocketFrameReader const &) = delete;
+	
+	uint64_t conetentLength() const noexcept;
+
+	uint32_t readFrame(rapid::IoBuffer* buffer, uint32_t &wantReadSize);
+
+	void reset() noexcept;
+
+	WebSocketOpcodes opcode() const noexcept;
+
+private:
 	enum State {
 		WS_PARSE_FIN,
 		WS_PARSE_EXPECTED_SIZE,
@@ -77,39 +91,24 @@ public:
 		WS_PARSE_DONE,
 	};
 
-	WebSocketFrameReader();
-	
-	uint64_t getConetentLength() const noexcept;
-
-	void readFrame(rapid::IoBuffer* buffer, uint32_t &wantReadSize);
-
-	void reset() noexcept;
-
-	WebSocketOpcodes opcode() const noexcept;
-
-private:
-
 	void parseFinAndContentLength(rapid::IoBuffer* buffer);
 
-	bool isReadyRead(rapid::IoBuffer* buffer);
+	bool isReadyToParseLength(rapid::IoBuffer* buffer);
 
 	void parseContentLength(rapid::IoBuffer* buffer);
 
-	void maskData(rapid::IoBuffer *buffer);
+	void decodeData(rapid::IoBuffer *buffer);
 
-	size_t getMaskSize() const noexcept;
+	uint32_t getMaskSize() const noexcept;
 
-	bool lastFrame_ : 1;
+	bool isFinFrame_ : 1;
 	bool isMasked_ : 1;
 	uint8_t unparsedContentLength_;
 	WebSocketOpcodes opcode_;
 	State state_;
 	char mask_[WS_MASK_SIZE];
-	int indexOfFirstMask_;
-	// 預期還要接收多少bytes才能夠接收到Length欄位和Mask欄位.
-	uint64_t bytesReceiveLengthAndMask_;
+	uint32_t lengthAndMaskSize_;
 	uint64_t contentLength_;
-	uint64_t totalReadBytes_;
 };
 
 class WebSocketCodec : public HttpCodec {
