@@ -31,6 +31,7 @@ FileSystemWatcher::FileSystemWatcher(std::wstring const &path, bool recursive, i
 
 FileSystemWatcher::~FileSystemWatcher() {
 	if (directory_ != INVALID_HANDLE_VALUE) {
+		::CancelIo(directory_);
 		::CloseHandle(directory_);
 	}
 }
