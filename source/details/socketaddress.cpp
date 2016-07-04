@@ -117,7 +117,7 @@ ADDRESS_FAMILY SocketAddress::getFamily() const {
 bool SocketAddress::operator==(SocketAddress const &other) noexcept {
 	if (getAddressLength() == other.getAddressLength()
 		&& getFamily() == other.getFamily()) {
-		return memcmp(&socketAddress_, other.getSockAddr(), getAddressLength()) == 0;
+		return memcmp(&storage_, other.getSockAddr(), getAddressLength()) == 0;
 	}
 	return false;
 }
@@ -126,12 +126,12 @@ void SocketAddress::setFromSockAddr(struct sockaddr const *address, socklen_t le
     switch (address->sa_family) {
     case AF_INET:
         RAPID_ENSURE(sizeof(sockaddr_in) == len);
-        memcpy(&socketAddress_, address, sizeof(sockaddr_in));
+        memcpy(&storage_, address, sizeof(sockaddr_in));
         addressLength_ = sizeof(sockaddr_in);
         break;
     case AF_INET6:
         RAPID_ENSURE(sizeof(sockaddr_in6) == len);
-        memcpy(&socketAddress_, address, sizeof(sockaddr_in6));
+        memcpy(&storage_, address, sizeof(sockaddr_in6));
         addressLength_ = sizeof(sockaddr_in6);
         break;
     default:
@@ -144,17 +144,17 @@ void SocketAddress::setFromString(std::string const &addr, uint16_t port) {
     clear();
     int retval = 0;
     if (isIPv4Address(addr)) {
-        retval = ::inet_pton(AF_INET, addr.c_str(), PVOID(&reinterpret_cast<sockaddr_in const *>(&socketAddress_)->sin_addr));
+        retval = ::inet_pton(AF_INET, addr.c_str(), PVOID(&reinterpret_cast<sockaddr_in const *>(&storage_)->sin_addr));
         if (retval > 0) {
-            reinterpret_cast<sockaddr_in *>(&socketAddress_)->sin_family = AF_INET;
-            reinterpret_cast<sockaddr_in *>(&socketAddress_)->sin_port = htons(port);
+            reinterpret_cast<sockaddr_in *>(&storage_)->sin_family = AF_INET;
+            reinterpret_cast<sockaddr_in *>(&storage_)->sin_port = htons(port);
             addressLength_ = sizeof(sockaddr_in);
         }
     } else if (isIPv6Address(addr)) {
-        retval = ::inet_pton(AF_INET6, addr.c_str(), PVOID(&reinterpret_cast<sockaddr_in6 const *>(&socketAddress_)->sin6_addr));
+        retval = ::inet_pton(AF_INET6, addr.c_str(), PVOID(&reinterpret_cast<sockaddr_in6 const *>(&storage_)->sin6_addr));
         if (retval > 0) {
-            reinterpret_cast<sockaddr_in6 *>(&socketAddress_)->sin6_family = AF_INET6;
-            reinterpret_cast<sockaddr_in6 *>(&socketAddress_)->sin6_port = htons(port);
+            reinterpret_cast<sockaddr_in6 *>(&storage_)->sin6_family = AF_INET6;
+            reinterpret_cast<sockaddr_in6 *>(&storage_)->sin6_port = htons(port);
             addressLength_ = sizeof(sockaddr_in6);
         }
     }
@@ -193,23 +193,23 @@ in_port_t SocketAddress::port() const {
 }
 
 struct sockaddr const * SocketAddress::getSockAddr() const noexcept {
-    return reinterpret_cast<sockaddr const *>(&socketAddress_);
+    return reinterpret_cast<sockaddr const *>(&storage_);
 }
 
 SocketAddress::operator const struct sockaddr * () const noexcept {
-    return reinterpret_cast<const struct sockaddr *>(&socketAddress_);
+    return reinterpret_cast<const struct sockaddr *>(&storage_);
 }
 
 SocketAddress::operator const struct sockaddr_in * () const noexcept {
-    return reinterpret_cast<const struct sockaddr_in *>(&socketAddress_);
+    return reinterpret_cast<const struct sockaddr_in *>(&storage_);
 }
 
 SocketAddress::operator const struct sockaddr_in6 * () const noexcept {
-    return reinterpret_cast<const struct sockaddr_in6 *>(&socketAddress_);
+    return reinterpret_cast<const struct sockaddr_in6 *>(&storage_);
 }
 
 SocketAddress::operator const struct sockaddr_storage * () const noexcept {
-    return &socketAddress_;
+    return &storage_;
 }
 
 socklen_t SocketAddress::getAddressLength() const noexcept {
@@ -250,10 +250,10 @@ std::string SocketAddress::toString() const {
     auto addr = getSockAddr();
     switch (addr->sa_family) {
     case AF_INET:
-        retval = ::WSAAddressToStringA((sockaddr*)&socketAddress_, sizeof(sockaddr_in), nullptr, buffer, &addrLen);
+        retval = ::WSAAddressToStringA((sockaddr*)&storage_, sizeof(sockaddr_in), nullptr, buffer, &addrLen);
         break;
     case AF_INET6:
-        retval = ::WSAAddressToStringA((sockaddr*)&socketAddress_, sizeof(sockaddr_in6), nullptr, buffer, &addrLen);
+        retval = ::WSAAddressToStringA((sockaddr*)&storage_, sizeof(sockaddr_in6), nullptr, buffer, &addrLen);
         break;
     default:
         RAPID_ENSURE(0 && "Unknown address type");
@@ -261,14 +261,14 @@ std::string SocketAddress::toString() const {
     }
 
     if (retval < 0) {
-        throw Exception(::GetLastError());
+        throw Exception();
     }
     return buffer;
 }
 #pragma warning(pop)
 
 void SocketAddress::clear() {
-    memset(&socketAddress_, 0, sizeof(socketAddress_));
+    memset(&storage_, 0, sizeof(storage_));
     addressLength_ = 0;
 }
 

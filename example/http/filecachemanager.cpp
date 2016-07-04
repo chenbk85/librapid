@@ -72,6 +72,12 @@ static inline HANDLE getFileHandle(std::string const &filePath, bool readOnly = 
 	return fileHandle;
 }
 
+static int64_t getFileSize(std::string const &filePath) {
+	struct __stat64 fileStat;
+	_stat64(filePath.c_str(), &fileStat);
+	return fileStat.st_size;
+}
+
 static inline int64_t getFileSizeByHandle(HANDLE handle) {
 	FILE_STANDARD_INFO fileInfo;
 	if (!::GetFileInformationByHandleEx(handle, FileStandardInfo, &fileInfo, sizeof(fileInfo))) {
@@ -317,8 +323,7 @@ std::shared_ptr<std::vector<char>> FileCacheManager::getFromMemoryCache(std::str
 
 		memoryCacheMap_[filePath] = pCompressFileCache;
 		return pCompressFileCache;
-	}
-	else {
+	} else {
 		memoryCacheMap_[filePath] = pFileCache;
 	}
 	return pFileCache;
@@ -345,8 +350,7 @@ std::shared_ptr<HttpFileReader> FileCacheManager::get(std::string const &filePat
 
 	if (!isExistCache(filePath, readerCookie)) {
 		readerCookie.pPool = std::make_shared<rapid::platform::SList<HttpFileReader*>>();
-		readerCookie.fileSize = rapid::platform::getFileSize(filePath);
-		readerCookie.expiresTime = time(nullptr);
+		readerCookie.fileSize = getFileSize(filePath);
 		cookieMap_[filePath] = readerCookie;
 	}
 
@@ -404,7 +408,7 @@ HttpMemoryFileReader::HttpMemoryFileReader(std::string const & filePath)
 }
 
 void HttpMemoryFileReader::open(std::string const &filePath) {
-	fileSize_ = rapid::platform::getFileSize(filePath);
+	fileSize_ = ::getFileSize(filePath);
 	mappedFile_.open(filePath, false);
 	remappedFile();
 }
@@ -444,8 +448,6 @@ bool HttpMemoryFileReader::read(rapid::IoBuffer * pBuffer, uint32_t bufferLen) {
 
 	pBuffer->makeWriteableSpace(SIZE_64KB);
 	bufferLen = SIZE_64KB;
-
-	pBuffer->makeWriteableSpace(bufferLen);
 
 	if (position_ == fileSize_) {
 		return true;

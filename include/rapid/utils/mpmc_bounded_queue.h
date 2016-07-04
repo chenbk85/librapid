@@ -57,7 +57,7 @@ public:
     ~mpmc_bounded_queue() {
     }
 
-    bool enqueue(T&& data) {
+    bool try_enqueue(T&& data) {
         cell_t* cell;
         size_t pos = enqueue_pos_.load(std::memory_order_relaxed);
         for (;;) {
@@ -78,7 +78,7 @@ public:
         return true;
     }
 
-    bool dequeue(T& data) {
+    bool try_dequeue(T& data) {
         cell_t* cell;
         size_t pos = dequeue_pos_.load(std::memory_order_relaxed);
         for (;;) {

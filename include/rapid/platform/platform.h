@@ -16,3 +16,6 @@ typedef int socklen_t;
 typedef char raw_type;
 
 #include <Winsock2.h>
+
+auto constexpr CACHE_LINE_PAD_SIZE = 128;
+auto constexpr MAX_CACHE_LINE_PAD_SIZE = 4096;

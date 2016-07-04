@@ -94,8 +94,7 @@ void HttpContext::onHttpGetMessage(rapid::ConnectionPtr &pConn) {
 		}
 		else if (pHttpRequest_->isWebSocketUpgradeRequest()) {
 			sendSwitchToWebSocketMessage(pConn);
-		}
-		else {
+		} else {
 			sendMessage(pConn);
 		}
 	}
@@ -193,14 +192,6 @@ void HttpContext::sendSwitchToHttp2cMessage(rapid::ConnectionPtr &pConn) {
 }
 
 void HttpContext::sendSwitchToWebSocketMessage(rapid::ConnectionPtr &pConn) {
-	/*
-	HTTP/1.1 101 Switching Protocols
-	Upgrade: websocket
-	Connection: Upgrade
-	Sec-WebSocket-Accept: fFBooB7FAkLlXgRSz0BT3v4hq5s=
-	Sec-WebSocket-Origin: null
-	Sec-WebSocket-Location: ws://example.com/
-	*/
 	RAPID_TRACE_CALL();
 
 	pHttpResponse_->setStatusCode(HTTP_SWITCHING_PROTOCOLS);

@@ -26,13 +26,17 @@ HttpStaticHeaderTable::~HttpStaticHeaderTable() {
 }
 
 std::pair<uint32_t, std::string const*> HttpStaticHeaderTable::getIndexedName(std::string const& name) const {
-	return getIndexedName(HttpStaticHeaderTable::hash(name));
+	auto hashValue = HttpStaticHeaderTable::hash(name);
+	return getIndexedName(hashValue, name);
 }
 
-std::pair<uint32_t, std::string const*> HttpStaticHeaderTable::getIndexedName(uint32_t hashValue) const {
+std::pair<uint32_t, std::string const*> HttpStaticHeaderTable::getIndexedName(uint32_t hashValue, std::string const& name) const {
 	auto index = hashValue % HASH_TABLE_SIZE;
+	if (headerHashTable_[index].size() == 1) {
+		return std::pair<uint32_t, std::string const*>(hashValue, headerHashTable_[index][0].second.get());
+	}
 	for (auto const &header : headerHashTable_[index]) {
-		if (header.first == hashValue) {
+		if ((*header.second) == name) {
 			return std::pair<uint32_t, std::string const*>(hashValue, header.second.get());
 		}
 	}

@@ -77,9 +77,8 @@ void IoThreadPool::joinAll() {
 	details::IoEventDispatcher::getInstance().postQuit();
 
     for (auto &thread : pool_) {
-        if (thread.joinable()) {
+        if (thread.joinable())
             thread.join();
-        }
     }
 
     pool_.clear();

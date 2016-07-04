@@ -99,47 +99,49 @@ static std::string getSymbolInformation(uint64_t frameAddress) {
 }
 
 static void dumpStackFrame(CONTEXT const *context, std::vector<uint64_t> &frameAddress) {
-    uint32_t machineType = 0;
+	uint32_t machineType = 0;
 
-    STACKFRAME64 frame = { 0 };
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrStack.Mode = AddrModeFlat;
+	STACKFRAME64 frame = { 0 };
+	frame.AddrPC.Mode = AddrModeFlat;
+	frame.AddrFrame.Mode = AddrModeFlat;
+	frame.AddrStack.Mode = AddrModeFlat;
 #ifdef _M_X64
-    frame.AddrPC.Offset = context->Rip;
-    frame.AddrFrame.Offset = context->Rbp;
-    frame.AddrStack.Offset = context->Rsp;
-    machineType = IMAGE_FILE_MACHINE_AMD64;
+	frame.AddrPC.Offset = context->Rip;
+	frame.AddrFrame.Offset = context->Rbp;
+	frame.AddrStack.Offset = context->Rsp;
+	machineType = IMAGE_FILE_MACHINE_AMD64;
 #else
-    frame.AddrPC.Offset = context->Eip;
-    frame.AddrFrame.Offset = context->Ebp;
-    frame.AddrStack.Offset = context->Esp;
-    machineType = IMAGE_FILE_MACHINE_I386;
+	frame.AddrPC.Offset = context->Eip;
+	frame.AddrFrame.Offset = context->Ebp;
+	frame.AddrStack.Offset = context->Esp;
+	machineType = IMAGE_FILE_MACHINE_I386;
 #endif
+
+	auto process = ::GetCurrentProcess();
+	auto thread = ::GetCurrentThread();
 
 	std::vector<char> modulePath(MAX_PATH);
 
-    for (auto &address : frameAddress) {
-        if (::StackWalk64(machineType,
-                          ::GetCurrentProcess(),
-                          ::GetCurrentThread(),
-                          &frame,
-                          PVOID(context),
-                          nullptr,
-                          ::SymFunctionTableAccess64,
-                          ::SymGetModuleBase64,
-                          nullptr) != FALSE) {
-	        auto moduleBase = ::SymGetModuleBase64(::GetCurrentProcess(), frame.AddrPC.Offset);
-            
+	for (auto &address : frameAddress) {
+		if (::StackWalk64(machineType,
+			process,
+			thread,
+			&frame,
+			PVOID(context),
+			nullptr,
+			::SymFunctionTableAccess64,
+			::SymGetModuleBase64,
+			nullptr) != FALSE) {
+			auto moduleBase = ::SymGetModuleBase64(::GetCurrentProcess(), frame.AddrPC.Offset);
 			if (moduleBase) {
 				modulePath[0] = '\0';
-                ::GetModuleFileNameA(reinterpret_cast<HINSTANCE>(moduleBase), modulePath.data(), MAX_PATH);
-            }
-            address = frame.AddrPC.Offset;
-        } else {
-            break;
-        }
-    }
+				::GetModuleFileNameA(reinterpret_cast<HINSTANCE>(moduleBase), modulePath.data(), MAX_PATH);
+			}
+			address = frame.AddrPC.Offset;
+		} else {
+			break;
+		}
+	}
 }
 
 static std::string stackFrameToText(std::vector<uint64_t> &frameAddress) {
@@ -156,17 +158,23 @@ static std::string stackFrameToText(std::vector<uint64_t> &frameAddress) {
 
 std::string logStackInfo(CONTEXT const *context) {
 	auto process = ::GetCurrentProcess();
+
+	if (process == INVALID_HANDLE_VALUE) {
+		// Maybe stack-overflow exception!
+		return "";	
+	}
+
 	if (!::SymInitialize(process, nullptr, TRUE)) {
-        return{ "SymInitialize() return failure." };
-    }
+		return{ "SymInitialize() return failure." };
+	}
 
 	std::shared_ptr<void> autoCleanup(nullptr, [process](void*) {
 		::SymCleanup(process);
-    });
+	});
 
-    std::vector<uint64_t> stackFrameAddress(MAX_STACK_FRAME_DEPTH);
-    dumpStackFrame(context, stackFrameAddress);
-    return stackFrameToText(stackFrameAddress);
+	std::vector<uint64_t> stackFrameAddress(MAX_STACK_FRAME_DEPTH);
+	dumpStackFrame(context, stackFrameAddress);
+	return stackFrameToText(stackFrameAddress);
 }
 
 std::string getStackTrace(EXCEPTION_POINTERS const *exceptionPtr) {

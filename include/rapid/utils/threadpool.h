@@ -75,7 +75,7 @@ inline void Worker::start(uint32_t id, std::weak_ptr<Worker> pPair) {
 			if (!pOther)
 				continue;
 			
-			if (queue_.dequeue(handler) || pOther->trySteal(handler)) {
+			if (queue_.try_dequeue(handler) || pOther->trySteal(handler)) {
 				try {
 					handler(); 
 				} catch (...) {
@@ -88,12 +88,12 @@ inline void Worker::start(uint32_t id, std::weak_ptr<Worker> pPair) {
 }
 
 inline bool Worker::trySteal(std::function<void(void)>& handler) noexcept {
-	return queue_.dequeue(handler);
+	return queue_.try_dequeue(handler);
 }
 
 template<typename Handler>
 inline bool Worker::tryPost(Handler &&handler) noexcept {
-	return queue_.enqueue(std::forward<Handler>(handler));
+	return queue_.try_enqueue(std::forward<Handler>(handler));
 }
 
 }
@@ -102,7 +102,7 @@ class ThreadPool {
 public:
 	static uint32_t constexpr DEFAULT_NUM_WORKER = 4096;
 
-	explicit ThreadPool(uint32_t numWorker = DEFAULT_NUM_WORKER);
+	explicit ThreadPool(uint32_t maxNumWorker = DEFAULT_NUM_WORKER);
 
 	ThreadPool(ThreadPool const &) = delete;
 	ThreadPool& operator=(ThreadPool const &) = delete;
@@ -110,22 +110,22 @@ public:
 	~ThreadPool();
 
 	template <typename Handler>
-	void excute(Handler &&handler);
+	void startNew(Handler &&handler);
 
 	template <typename Handler, typename R = typename std::result_of<Handler()>::type>
 	typename std::future<R> makeFuture(Handler &&handler);
 private:
-	details::Worker & getNextWorker();
+	details::Worker & getWorker();
 
 	std::atomic<uint32_t> index_;
 	std::vector<std::shared_ptr<details::Worker>> workers_;
 };
 
-inline ThreadPool::ThreadPool(uint32_t numWorker) {
+inline ThreadPool::ThreadPool(uint32_t maxNumWorker) {
 	workers_.resize(std::thread::hardware_concurrency());
 
 	for (auto &pWorker : workers_) {
-		pWorker.reset(new details::Worker(numWorker));
+		pWorker.reset(new details::Worker(maxNumWorker));
 	}
 
 	for (size_t i = 0; i < workers_.size(); ++i) {
@@ -137,7 +137,7 @@ inline ThreadPool::ThreadPool(uint32_t numWorker) {
 inline ThreadPool::~ThreadPool() {
 }
 
-inline details::Worker & ThreadPool::getNextWorker() {
+inline details::Worker & ThreadPool::getWorker() {
 	auto id = *details::getCurrentThreadId();
 	if (id > workers_.size()) {
 		id = index_.fetch_add(1, std::memory_order_relaxed) % workers_.size();
@@ -146,8 +146,8 @@ inline details::Worker & ThreadPool::getNextWorker() {
 }
 
 template<typename Handler>
-inline void ThreadPool::excute(Handler && handler) {
-	if (!getNextWorker().tryPost(std::forward<Handler>(handler))) {
+inline void ThreadPool::startNew(Handler && handler) {
+	if (!getWorker().tryPost(std::forward<Handler>(handler))) {
 		throw std::overflow_error("worker queue is full");
 	}
 }
@@ -160,7 +160,7 @@ typename std::future<R> ThreadPool::makeFuture(Handler &&handler) {
 
 	std::future<R> result = task.get_future();
 
-	if (!getNextWorker().tryPost(task)) {
+	if (!getWorker().tryPost(task)) {
 		throw std::overflow_error("worker queue is full");
 	}
 

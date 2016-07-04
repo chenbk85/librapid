@@ -43,8 +43,6 @@ public:
 
 	uint32_t getSlicePageCount() const noexcept;
 
-    void traverse(TraverseCallback callback) const;
-
 private:
 	MemAllocatorPtr pAllocator_;
     char *pBaseAddress_;

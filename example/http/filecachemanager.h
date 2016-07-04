@@ -137,10 +137,9 @@ public:
 			if (!pPool) {
 				pHttpReader->close();
 			} else {
-				pPool->enqueue(pHttpReader);
+				pPool->enqueue(std::move(pHttpReader));
 			}
 		}
-
 		std::weak_ptr<rapid::platform::SList<HttpFileReader*>> pFileReaderPool;
 	};
 
@@ -156,6 +155,7 @@ public:
 	std::shared_ptr<HttpFileReader> get(std::string const &filePath, bool compress = false);
 
 private:
+	static uint32_t constexpr CACHE_FILE_QUEUE_SIZE = 4096;
 	static uint32_t constexpr CACHE_FILE_SIZE = 16 * 1024;
 	static uint32_t constexpr NO_CACHE_SIZE = 10 * CACHE_FILE_SIZE;
 

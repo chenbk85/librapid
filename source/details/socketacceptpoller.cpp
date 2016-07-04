@@ -33,8 +33,7 @@ namespace details {
 static void defaultCreateContextCallback(ConnectionPtr) {
 }
 
-SocketAcceptPooller::SocketAcceptPooller(std::shared_ptr<TcpServerSocket> &listenSocket,
-                                   std::shared_ptr<BlockFactory> &factory)
+SocketAcceptPooller::SocketAcceptPooller(std::shared_ptr<TcpServerSocket> &listenSocket, std::shared_ptr<BlockFactory> &factory)
     : contextCallback_(defaultCreateContextCallback)
     , pListenSocket_(listenSocket)
     , pBlockFactory_(factory)
@@ -119,8 +118,7 @@ void SocketAcceptPooller::startPoll() {
     }
 
 	// 建立TIME-WAIT狀態的timer(系統設定)
-	pReuseTimingWheel_ = TimingWheel::createTimingWheel(1000 
-		* platform::TcpIpParameters::getInstance().getTcpTimedWaitDelay(), 60);
+	pReuseTimingWheel_ = TimingWheel::createTimingWheel(1000 * platform::TcpIpParameters::getInstance().getTcpTimedWaitDelay(), 60);
 	pReuseTimingWheel_->start();
 
 	details::IoEventDispatcher::getInstance().addDevice(pListenSocket_->handle(), 0);

@@ -6,6 +6,9 @@
 #pragma once
 
 #include <memory>
+
+#include <btree_map.h>
+
 #include <rapid/platform/spinlock.h>
 #include <rapid/details/timingwheel.h>
 #include <rapid/tcpserver.h>
@@ -40,5 +43,6 @@ private:
 	mutable rapid::platform::Spinlock lock_;
 	std::mutex waitStopMutex_;
 	std::condition_variable stopFlag_;
-	std::unordered_map<size_t, HttpContextPtr> contextMap_;
+	//std::unordered_map<size_t, HttpContextPtr> contextMap_;
+	btree::btree_map<size_t, HttpContextPtr> contextMap_;
 };

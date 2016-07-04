@@ -107,7 +107,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;__SSE4_2__;WIN32_LEAN_AND_MEAN;ZIP_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../../include/;../../thirdparty/rapidjson/include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/MurmurHash3/;C:\OpenSSL-Win64\include;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/rapidxml/include/;../../thirdparty/date/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../include/;../../thirdparty/rapidjson/include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/MurmurHash3/;C:\OpenSSL-Win64\include;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/rapidxml/include/;../../thirdparty/date/;../../thirdparty/btree/</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
@@ -155,7 +155,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;WIN32_LEAN_AND_MEAN;__SSE4_2__;ZIP_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../../include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/rapidxml/include/;../../thirdparty/hash/;../../thirdparty/stlencoders/include/;../../thirdparty/openssl/include/;../../thirdparty/rapidjson/include/;../../thirdparty/MurmurHash3/;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/date/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../include/;../../thirdparty/zlib/include/;../../thirdparty/http_parser/;../../thirdparty/picohttpparser/;../../thirdparty/multipartparser/;../../thirdparty/rapidxml/include/;../../thirdparty/hash/;../../thirdparty/stlencoders/include/;../../thirdparty/openssl/include/;../../thirdparty/rapidjson/include/;../../thirdparty/MurmurHash3/;../../thirdparty/libzippp/src/;../../thirdparty/libzip/lib/;../../thirdparty/libzip/build/;../../thirdparty/date/;../../thirdparty/btree/</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
@@ -263,6 +263,7 @@
     <ClInclude Include="..\..\include\rapid\utilis.h" />
     <ClInclude Include="..\..\include\rapid\utils\byteorder.h" />
     <ClInclude Include="..\..\include\rapid\utils\horspool.h" />
+    <ClInclude Include="..\..\include\rapid\utils\mpmc_bounded_queue.h" />
     <ClInclude Include="..\..\include\rapid\utils\racedetect.h" />
     <ClInclude Include="..\..\include\rapid\utils\scopeguard.h" />
     <ClInclude Include="..\..\include\rapid\utils\singleton.h" />

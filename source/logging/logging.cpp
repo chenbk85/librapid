@@ -14,6 +14,8 @@
 #include <condition_variable>
 #include <concurrent_queue.h>
 
+#include <rapid/platform/filesystemmonitor.h>
+
 #include <rapid/details/contracts.h>
 
 #include <rapid/utils/singleton.h>
@@ -91,7 +93,7 @@ public:
 
     template <typename Lambda>
 	void add(Lambda &&lambda) {
-        queue_.enqueue(std::move(lambda));
+        queue_.try_enqueue(std::move(lambda));
     }
 
     void stop();
@@ -112,7 +114,7 @@ LoggingWorker::LoggingWorker()
 		std::function<void()> action;
         lastWriteTime_.reset();
         while (!stopped_) {
-            if (!queue_.dequeue(action)) {
+            if (!queue_.try_dequeue(action)) {
                 auto lastWriteTime = lastWriteTime_.elapsed<std::chrono::microseconds>();
                 if (lastWriteTime <= std::chrono::microseconds(50)) {
                     continue;

@@ -49,6 +49,7 @@ static void setSocketOption(details::TcpSocket &pSocket) {
         throw Exception();
     }
 
+	// Enable Fast path future
     if (::IsWindows8OrGreater()) {
         if (!pSocket.ioctl(SIO_LOOPBACK_FAST_PATH)) {
             throw Exception();
@@ -234,6 +235,8 @@ details::SocketAddress const & Connection::getLocalSocketAddress() const noexcep
 }
 
 void Connection::sendAndDisconnec() {
+	RAPID_TRACE_CALL();
+
 	auto pBuffer = getSendBuffer();
 	if (pBuffer->isEmpty()) {
 		acceptSocket_.shutdownSend();

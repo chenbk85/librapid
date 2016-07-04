@@ -153,9 +153,8 @@ private:
 
 __forceinline bool HttpHeaders::has(HttpHeaderName const& header) const noexcept {
 	for (auto const &code : headerNames_) {
-		if (code.first == header.hash()) {
+		if (code.first == header.hash())
 			return true;
-		}
 	}
 	return false;
 }

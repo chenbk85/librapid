@@ -27,8 +27,7 @@ class IoEventDispatcher;
 
 class SocketAcceptPooller {
 public:
-    SocketAcceptPooller(std::shared_ptr<TcpServerSocket> &listenSocket,
-                     std::shared_ptr<BlockFactory> &factory);
+    SocketAcceptPooller(std::shared_ptr<TcpServerSocket> &listenSocket, std::shared_ptr<BlockFactory> &factory);
 
     SocketAcceptPooller(SocketAcceptPooller const &) = delete;
     SocketAcceptPooller& operator=(SocketAcceptPooller const &) = delete;

@@ -43,7 +43,9 @@ WsaExtAPI::WsaExtAPI()
 	: isIfsHandleFlag_(false) {
 
 	isIfsHandleFlag_ = checkIFSProviders();
-	RAPID_LOG_INFO() << "isIfsHandleFlag=" << (isIfsHandleFlag_ ? "True" : "False");
+
+	RAPID_LOG_IF(rapid::logging::Warn, !isIfsHandleFlag_) 
+		<< "isIfsHandleFlag=" << (isIfsHandleFlag_ ? "True" : "False");
 
     TcpSocket tmp;
 
@@ -89,7 +91,7 @@ void WsaExtAPI::cancelPendingIoRequest(Socket const &socket, OVERLAPPED *overlap
     if (retval == TRUE && lastError != ERROR_NOT_FOUND) {
         DWORD numTransferBytes = 0;
         if (!::GetOverlappedResult(reinterpret_cast<HANDLE>(socket.socketFd()), overlapped, &numTransferBytes, TRUE)) {
-            RAPID_LOG_INFO() << __FUNCTION__ << " return failure! error=" << lastError;
+			RAPID_LOG_WARN() << __FUNCTION__ << " return failure! error=" << lastError;
         }
     }
 }
@@ -121,7 +123,7 @@ void WsaExtAPI::cancelAllPendingIoRequest(Socket const &socket) const {
     if (retval == TRUE && lastError != ERROR_NOT_FOUND) {
         DWORD bytesTransferred = 0;
         if (!::GetOverlappedResult(reinterpret_cast<HANDLE>(socket.socketFd()), &overlapped, &bytesTransferred, TRUE)) {
-            RAPID_LOG_INFO() << __FUNCTION__ << " return failure! error=" << lastError;
+            RAPID_LOG_WARN() << __FUNCTION__ << " return failure! error=" << lastError;
         }
     }
 }

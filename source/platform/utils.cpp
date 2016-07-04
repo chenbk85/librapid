@@ -307,34 +307,10 @@ std::string getFinalPathNameByHandle(HANDLE fileHandle) {
     return path;
 }
 
-std::vector<uint32_t> enumThreadIds() {
-	auto const processId = ::GetCurrentProcessId();
-	std::unique_ptr<void, decltype(&::CloseHandle)> snapshotHandle(
-		::CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0), &::CloseHandle);
-	THREADENTRY32 threadEntry = { 0 };
-	threadEntry.dwSize = sizeof(THREADENTRY32);
-	if (!::Thread32First(snapshotHandle.get(), &threadEntry)) {
-		throw Exception();
-	}
-	std::vector<uint32_t> threadIds;
-	for (; ::Thread32Next(snapshotHandle.get(), &threadEntry);) {
-		if (threadEntry.th32OwnerProcessID == processId) {
-			threadIds.push_back(threadEntry.th32ThreadID);
-		}
-	}
-	return threadIds;
-}
-
 void setProcessPriorityBoost(bool enableBoost) {
     if (!::SetProcessPriorityBoost(::GetCurrentProcess(), enableBoost)) {
         throw Exception();
     }
-}
-
-int64_t getFileSize(std::string const &filePath) {
-	struct __stat64 fileStat;
-	_stat64(filePath.c_str(), &fileStat);
-	return fileStat.st_size;
 }
 
 void prefetchVirtualMemory(char const * virtualAddress, size_t size) {
@@ -348,32 +324,20 @@ void prefetchVirtualMemory(char const * virtualAddress, size_t size) {
 	}
 }
 
-std::vector<std::string> getInterfaceNameList() {
+std::vector<std::string> getNetworkInterfaceNameList() {
 	std::vector<std::string> interfaceList;
 	std::vector<char> buffer;
-	/*
-	PIP_INTERFACE_INFO pInterfaceInfo = nullptr;
-	DWORD interfaceInfoSize = 0;
-	auto ret = ::GetInterfaceInfo(nullptr, &interfaceInfoSize);
-	if (ret == ERROR_INSUFFICIENT_BUFFER) {
-	buffer.resize(interfaceInfoSize);
-	pInterfaceInfo = reinterpret_cast<PIP_INTERFACE_INFO>(buffer.data());
-	}
-	ret = ::GetInterfaceInfo(pInterfaceInfo, &interfaceInfoSize);
-	if (ret == NO_ERROR) {
-	for (DWORD i = 0; i < pInterfaceInfo->NumAdapters; ++i) {
-	interfaceList.emplace_back(pInterfaceInfo->Adapter[i].Name);
-	}
-	}
-	*/
-
+	
 	PIP_ADAPTER_INFO pInterfaceInfo = nullptr;
 	DWORD interfaceInfoSize = 0;
 	auto ret = ::GetAdaptersInfo(nullptr, &interfaceInfoSize);
 	if (ret == ERROR_BUFFER_OVERFLOW) {
 		buffer.resize(interfaceInfoSize);
 		pInterfaceInfo = reinterpret_cast<PIP_ADAPTER_INFO>(buffer.data());
+	} else {
+		throw Exception();
 	}
+
 	ret = ::GetAdaptersInfo(pInterfaceInfo, &interfaceInfoSize);
 	if (ret == NO_ERROR) {
 		while (pInterfaceInfo) {

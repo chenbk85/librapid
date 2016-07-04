@@ -14,8 +14,6 @@ namespace rapid {
 
 namespace platform {
 
-static int constexpr CACHE_LINE_SIZE = 64;
-
 template <typename T, typename Allocator = std::allocator<T>>
 class SList {
 public:
@@ -44,7 +42,7 @@ public:
 private:
     struct SListEntry {
 #define PAD_SIZE \
-	CACHE_LINE_SIZE - (sizeof(SLIST_ENTRY) + sizeof(value_type)) % CACHE_LINE_SIZE
+	CACHE_LINE_PAD_SIZE - (sizeof(SLIST_ENTRY) + sizeof(value_type)) % CACHE_LINE_PAD_SIZE
         SLIST_ENTRY itemEntry;
 		value_type element;
 		char pad[PAD_SIZE];

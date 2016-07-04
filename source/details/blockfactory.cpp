@@ -131,12 +131,12 @@ std::shared_ptr<BlockFactory> BlockFactory::createBlockFactory(uint8_t numNumaNo
 	return std::make_shared<BlockFactory>(pAllocator, maxPageCount, bufferSize);
 }
 
-BlockFactory::BlockFactory(MemAllocatorPtr pAllocator, uint32_t maxPageCount, uint32_t maxPageBoundarySize) {
-    pAllocator_ = pAllocator;
-    pageBoundarySize_ = maxPageBoundarySize;
-	pBaseAddress_ = pAllocator_->getBaseAddress();
-    totalPageCount_ = maxPageCount;
-	count_ = 0;
+BlockFactory::BlockFactory(MemAllocatorPtr pAllocator, uint32_t maxPageCount, uint32_t maxPageBoundarySize)
+	: pAllocator_(pAllocator)
+	, pageBoundarySize_(maxPageBoundarySize)
+	, pBaseAddress_(pAllocator_->getBaseAddress())
+	, totalPageCount_(maxPageCount)
+	, count_(0) {
 }
 
 Block BlockFactory::getBlock() {
@@ -156,21 +156,6 @@ MemAllocatorPtr BlockFactory::getAllocator() const {
 
 uint32_t BlockFactory::getSlicePageCount() const noexcept {
     return pageBoundarySize_ / platform::SystemInfo::getInstance().getPageSize();
-}
-
-void BlockFactory::traverse(TraverseCallback callback) const {
-    auto slicePageCount = getSlicePageCount();
-	auto baseAddr = pAllocator_->getBaseAddress();
-
-    for (uint32_t i = 0; i < totalPageCount_; ++i) {
-        for (uint32_t page = 0; page < slicePageCount; ++page) {
-            MEMORY_BASIC_INFORMATION info;
-			memset(&info, 0, sizeof(MEMORY_BASIC_INFORMATION));
-			pAllocator_->query(baseAddr, &info);
-            callback(info);
-            baseAddr += platform::SystemInfo::getInstance().getPageSize();
-        }
-    }
 }
 
 }

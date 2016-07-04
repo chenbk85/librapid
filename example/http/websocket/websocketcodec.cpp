@@ -180,7 +180,10 @@ void WebSocketFrameReader::parseFinAndContentLength(rapid::IoBuffer* pBuffer) {
 	isMasked_ = (sencondByte & 0x80) >> 7;
 
 	// TODO: throw invalid format exception?
-	RAPID_ENSURE(isMasked_ && "Browse should always mask the payload data");
+	if (!isMasked_) {
+		RAPID_LOG_ERROR() << "Browse should always mask the payload data";
+		return;
+	}
 
 	opcode_ = static_cast<WebSocketOpcodes>(firstByte & WS_MASK_OPCODE);
 	switch (opcode_) {
@@ -263,7 +266,6 @@ uint32_t WebSocketFrameReader::getMaskSize() const noexcept {
 }
 
 uint64_t WebSocketFrameReader::conetentLength() const noexcept {
-	RAPID_ENSURE(state_ == WS_PARSE_DONE);
 	return contentLength_;
 }
 
@@ -272,8 +274,8 @@ uint32_t WebSocketFrameReader::readFrame(rapid::IoBuffer* buffer, uint32_t &want
 	RAPID_TRACE_CALL();
 	switch (state_) {
 	case WS_PARSE_FIN:
-		if (buffer->isEmpty()) {
-			wantReadSize = WS_MIN_SIZE;
+		if (buffer->readable() < WS_MIN_SIZE) {
+			wantReadSize = WS_MIN_SIZE - buffer->readable();
 			break;
 		}
 		parseFinAndContentLength(buffer);
@@ -315,13 +317,12 @@ void WebSocketCodec::readLoop(rapid::ConnectionPtr &pConn, uint32_t &bytesToRead
 	auto pBuffer = pConn->getReceiveBuffer();
 	
 	do {
-		auto bytesRemained = reader_.readFrame(pBuffer, bytesToRead);
+		reader_.readFrame(pBuffer, bytesToRead);
 		if (!bytesToRead) {
 			pWebSocketRequest_->setOpcode(reader_.opcode());
 			pWebSocketRequest_->setContentLength(reader_.conetentLength());
 			reader_.reset();
 			dispatcher_->onMessage(WS_MESSAGE, pConn, pWebSocketRequest_);
-			if (bytesRemained > 0) break;
 		}
 	} while (!bytesToRead && !pBuffer->isEmpty());
 }

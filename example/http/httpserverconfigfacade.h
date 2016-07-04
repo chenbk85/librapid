@@ -7,6 +7,8 @@
 
 #include <thread>
 
+#include <rapid/details/timer.h>
+
 #include <rapid/objectpool.h>
 #include <rapid/utils/singleton.h>
 
@@ -32,6 +34,12 @@ using Http2ResponsePool = rapid::ObjectPool<Http2Response>;
 using HttpContextPool = rapid::ObjectPool<HttpContext>;
 using HttpsContextPool = rapid::ObjectPool<HttpsContext>;
 using Http2StreamPool = rapid::ObjectPool<Http2Stream>;
+
+namespace rapid {
+namespace platform {
+	class FileSystemWatcher;
+}
+}
 
 class HttpServerConfigFacade : public rapid::utils::Singleton<HttpServerConfigFacade> {
 public:
@@ -95,7 +103,6 @@ private:
 
 	bool enableHttp2Proto_ : 1;
 	bool enableSSLProto_ : 1;
-	volatile bool stoppedMonitor_ : 1;
 	bool upgradeableHttp2_ : 1;
 	int listenPort_;
 	uint16_t numaNode_;
@@ -118,7 +125,8 @@ private:
 	HttpContextPool httpContextPool_;
 	HttpsContextPool httpsContextPool_;
 	FileCacheManager fileCacheManager_;
-	std::thread configChangeMonitorThread_;
+	std::unique_ptr<rapid::platform::FileSystemWatcher> pFileWatcher_;
+	rapid::details::TimerPtr pFileWatchTimer_;
 };
 
 __forceinline uint32_t HttpServerConfigFacade::getInitalUserConnection() const noexcept {

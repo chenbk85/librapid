@@ -43,12 +43,10 @@ void Buffer::expandSize(uint32_t size) {
 }
 
 void Buffer::protect() const {
-    RAPID_ENSURE(block_.pMem != nullptr);
 	pAllocator_->protect(block_.pMem, commitSize_);
 }
 
 void Buffer::release() const {
-	RAPID_ENSURE(block_.pMem != nullptr);
 	pAllocator_->decommit(block_.pMem, commitSize_);
 }
 

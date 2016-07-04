@@ -327,6 +327,9 @@
     <ClInclude Include="..\..\include\rapid\platform\filesystemmonitor.h">
       <Filter>Source Files\platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rapid\utils\mpmc_bounded_queue.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\iobuffer.cpp">

@@ -91,9 +91,12 @@ void HttpServer::start() {
 		RAPID_LOG_INFO() << "Enable HTTP/2";
 	}
 
+	auto numaNode = HttpServerConfigFacade::getInstance().getNumaNode();
+
 	server_.startListening([this](rapid::ConnectionPtr &pConn) {
 		onNewConnection(pConn);
-	}, HttpServerConfigFacade::getInstance().getNumaNode());
+	}, numaNode);
+
 	RAPID_LOG_INFO() << "HttpServer starting...";
 	RAPID_LOG_INFO() << "Press 'Ctrl+C' to stop";
 	std::unique_lock<std::mutex> lock(waitStopMutex_);
@@ -104,7 +107,7 @@ void HttpServer::start() {
 void HttpServer::onNewConnection(rapid::ConnectionPtr &pConn) {
 	pConn->setAcceptEventHandler([this](rapid::ConnectionPtr &conn) {
 		auto const &remoteAddress = conn->getRemoteSocketAddress();
-		RAPID_LOG_INFO() << "Accepted address: " << remoteAddress.toString();
+		RAPID_LOG_TRACE() << "Accepted address: " << remoteAddress.toString();
 		auto pContext = insertHttpContext(remoteAddress.hash());
 		if (HttpServerConfigFacade::getInstance().isUseSSL()) {
 			conn->setSendEventHandler([pContext](rapid::ConnectionPtr &c) {
@@ -119,7 +122,7 @@ void HttpServer::onNewConnection(rapid::ConnectionPtr &pConn) {
 
 	pConn->setDisconnectEventHandler([this](rapid::ConnectionPtr &conn) {
 		auto const &remoteAddress = conn->getRemoteSocketAddress();
-		RAPID_LOG_INFO() << "Disconnect address: " << remoteAddress.toString();
+		RAPID_LOG_TRACE() << "Disconnect address: " << remoteAddress.toString();
 		auto pContext = removeHttpContext(remoteAddress.hash());
 		pContext->onDisconnect(conn);
 	});

@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
+#include <filesystem>
 
 #include <rapidxml/rapidxml.hpp>
 #include <rapidxml/rapidxml_utils.hpp>
@@ -76,7 +77,6 @@ HttpServerConfigFacade::HttpServerConfigFacade()
 	: enableHttp2Proto_(false)
 	, enableSSLProto_(false)
 	, upgradeableHttp2_(false)
-	, stoppedMonitor_(true)
 	, listenPort_(80)
 	, numaNode_(0)
 	, bufferSize_(0)
@@ -85,9 +85,6 @@ HttpServerConfigFacade::HttpServerConfigFacade()
 }
 
 HttpServerConfigFacade::~HttpServerConfigFacade() {
-	stoppedMonitor_ = true;
-	if (configChangeMonitorThread_.joinable())
-		configChangeMonitorThread_.join();
 }
 
 void HttpServerConfigFacade::loadConfiguration(std::string const &filePath) {
@@ -100,7 +97,7 @@ void HttpServerConfigFacade::loadConfiguration(std::string const &filePath) {
 	std::map<std::string, std::string> tcpSettings;
 	auto server = (*httpServer).first_node("Server");
 	readXmlSettings(server, tcpSettings);
-	// Setting Tcp config
+	// Setting TCP config
 	{
 		listenPort_ = std::strtoul(tcpSettings["Port"].c_str(), nullptr, 10);
 		initialUserConnection_ = std::strtoul(tcpSettings["InitialUserConnection"].c_str(), nullptr, 10);
@@ -112,7 +109,7 @@ void HttpServerConfigFacade::loadConfiguration(std::string const &filePath) {
 	std::map<std::string, std::string> httpSettings;
 	auto http = (*httpServer).first_node("Http");
 	readXmlSettings(http, httpSettings);
-	// Setting Http config
+	// Setting HTTP config
 	{
 		host_ = httpSettings["Host"];
 		serverName_ = httpSettings["ServerName"];
@@ -156,28 +153,22 @@ void HttpServerConfigFacade::loadConfiguration(std::string const &filePath) {
 		return;
 	}
 
-	stoppedMonitor_ = false;
+	namespace FS = std::tr2::sys;
+	FS::path watchFilePath(filePath);
 
-	configChangeMonitorThread_ = std::thread([this, filePath]() {
-		auto tmp = filePath;
-		tmp.erase(tmp.rfind("\\"));
-		rapid::platform::FileSystemWatcher watcher(rapid::utils::fromBytes(tmp));
+	pFileWatcher_ = std::make_unique<rapid::platform::FileSystemWatcher>(watchFilePath.parent_path());
+	pFileWatchTimer_ = rapid::details::Timer::createTimer();
 
-		while (!stoppedMonitor_) {
-			auto changedFile = watcher.getChangedFile();
-
-			if (!changedFile.empty()) {
-				RAPID_LOG_INFO() << "File configuration changed!";
-				try {
-					reloadConfiguration(filePath);
-				} catch (std::exception const &e) {
-					RAPID_LOG_FATAL() << e.what();
-				}				
-			} else {
-				std::this_thread::sleep_for(std::chrono::milliseconds(500));
-			}				
+	pFileWatchTimer_->start([this, filePath]() {
+		if (!pFileWatcher_->getChangedFile().empty()) {
+			RAPID_LOG_TRACE() << "File configuration changed!";
+			try {
+				reloadConfiguration(filePath);
+			} catch (std::exception const &e) {
+				RAPID_LOG_FATAL() << e.what();
+			}
 		}
-	});
+	}, 500);
 }
 
 void HttpServerConfigFacade::reloadConfiguration(std::string const &filePath) {
@@ -197,7 +188,7 @@ void HttpServerConfigFacade::reloadConfiguration(std::string const &filePath) {
 			return;
 		}
 		auto level = loggerSettings["Level"];
-		RAPID_LOG_INFO() << "New logging level: " << level;
+		RAPID_LOG_TRACE() << "New logging level: " << level;
 		rapid::logging::setLogLevel(getLogLevel(level));
 	}
 }

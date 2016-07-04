@@ -78,7 +78,7 @@ public:
     operator const struct sockaddr_storage * () const noexcept;
 
 private:
-    struct sockaddr_storage socketAddress_;
+    struct sockaddr_storage storage_;
     socklen_t addressLength_;
 };
 
@@ -88,7 +88,7 @@ inline SocketAddress::SocketAddress(SocketAddress const &other) {
 
 inline SocketAddress& SocketAddress::operator=(SocketAddress const &other) {
 	if (this != &other) {
-		memcpy(&socketAddress_, &other.socketAddress_, sizeof(other.socketAddress_));
+		memcpy(&storage_, &other.storage_, sizeof(other.storage_));
 		addressLength_ = other.addressLength_;
 	}
     return *this;

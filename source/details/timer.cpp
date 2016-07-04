@@ -49,7 +49,9 @@ void Timer::stop() {
 }
 
 void Timer::timeout() {
-    onTimeoutCallback_();
+	try {
+		onTimeoutCallback_();
+	} catch (...) { }
 }
 
 }

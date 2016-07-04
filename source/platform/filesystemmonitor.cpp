@@ -66,20 +66,17 @@ void FileSystemWatcher::readChangedFile() {
 		if (changedFiles_.empty() || fileName != changedFiles_.back())
 			changedFiles_.push(std::move(fileName));
 
-		if (p->NextEntryOffset == 0)
+		if (!p->NextEntryOffset)
 			break;
 	}
 }
 
 std::wstring FileSystemWatcher::getChangedFile() {
-	for (int i = 2; i--;) {
+	while (true) {
 		DWORD bytesRetured = 0;
 
 		if (!::GetOverlappedResult(directory_, &ov_, &bytesRetured, FALSE))
 			break;
-
-		if (!HasOverlappedIoCompleted(&ov_))
-			return L"";
 
 		readChangedFile();
 

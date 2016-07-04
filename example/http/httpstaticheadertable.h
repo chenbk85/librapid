@@ -21,8 +21,6 @@ public:
 
 	std::pair<uint32_t, std::string const*> getIndexedName(std::string const& name) const;
 
-	std::pair<uint32_t, std::string const*> getIndexedName(uint32_t hashValue) const;
-
 	static __forceinline uint32_t hash(std::string const& name) noexcept {
 		uint32_t value = 0;
 		MurmurHash3_x86_32(name.c_str(), static_cast<uint32_t>(name.length()), 0, &value);
@@ -31,6 +29,9 @@ public:
 
 private:
 	static size_t constexpr HASH_TABLE_SIZE = 2048;
+
+	std::pair<uint32_t, std::string const*> getIndexedName(uint32_t hashValue, std::string const& name) const;
+
 	std::vector<std::vector<std::pair<uint32_t, std::unique_ptr<std::string>>>> headerHashTable_;
 };
 

@@ -17,9 +17,9 @@ namespace platform {
 
 class FileSystemWatcher {
 public:
-	FileSystemWatcher(std::wstring const &path, bool recursive = true, int operationTowatch = -1);
+	explicit FileSystemWatcher(std::wstring const &path, bool recursive = true, int operationTowatch = -1);
 
-	~FileSystemWatcher();
+	~FileSystemWatcher() noexcept;
 
 	FileSystemWatcher(FileSystemWatcher const &) = delete;
 	FileSystemWatcher& operator=(FileSystemWatcher const &) = delete;
@@ -27,6 +27,7 @@ public:
 	std::wstring getChangedFile();
 private:
 	bool readChanged();
+
 	void readChangedFile();
 
 	// NOTICE: Must be 4 bytes aligned buffer

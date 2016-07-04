@@ -11,11 +11,6 @@ namespace rapid {
 namespace details {
 
 IoEventQueue::IoEventQueue(uint32_t concurrentThreadCount) {
-    // https://msdn.microsoft.com/zh-tw/library/windows/desktop/aa363862(v=vs.85).aspx
-    //
-    // If this parameter(NumberOfConcurrentThreads) is zero,
-    // the system allows as many concurrently running threads
-    // as there are processors in the system.
     handle = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, concurrentThreadCount);
     if (!handle) {
         throw Exception();
@@ -25,7 +20,6 @@ IoEventQueue::IoEventQueue(uint32_t concurrentThreadCount) {
 IoEventQueue::~IoEventQueue() noexcept {
     if (handle != nullptr) {
         ::CloseHandle(handle);
-        handle = nullptr;
     }
 }
 
